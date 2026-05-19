@@ -1,0 +1,6 @@
+com\ftn\sbnz\model\StatusSerije.class
+com\ftn\sbnz\model\FazaProizvodnje.class
+com\ftn\sbnz\model\PraviloSoli.class
+com\ftn\sbnz\model\Serija.class
+com\ftn\sbnz\model\TipProizvoda.class
+com\ftn\sbnz\model\PraviloGubitakTezine.class

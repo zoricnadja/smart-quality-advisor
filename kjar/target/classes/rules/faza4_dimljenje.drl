@@ -1,0 +1,114 @@
+package com.ftn.sbnz.rules;
+
+import com.ftn.sbnz.model.Serija;
+import com.ftn.sbnz.model.StatusSerije;
+import com.ftn.sbnz.model.FazaProizvodnje;
+
+// ============================================================
+//  FAZA 4 – DIMLJENJE (forward chaining + CEP agregacija)
+// ============================================================
+
+// F4-1 (Nivo 1): Temperatura dima > 90°C → upozorenje sušenje kore
+rule "F4-1 Temperatura dima previsoka"
+    salience 100
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.DIMLJENJE,
+            status != StatusSerije.BLOKIRANA,
+            temperaturaDima > 90.0
+        )
+    then
+        $s.dodajUpozorenje("F4-1: TempDimaPrevisoka - temperatura = " + $s.getTemperaturaDima() + "°C (> 90°C, rizik sušenja kore)");
+        update($s);
+end
+
+// F4-2 (Nivo 1): Temperatura dima < 55°C → upozorenje nedovoljna termička obrada
+rule "F4-2 Temperatura dima preniska"
+    salience 100
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.DIMLJENJE,
+            status != StatusSerije.BLOKIRANA,
+            temperaturaDima < 55.0
+        )
+    then
+        $s.dodajUpozorenje("F4-2: TempDimaPreniska - temperatura = " + $s.getTemperaturaDima() + "°C (< 55°C, rizik nedovoljne termičke obrade)");
+        update($s);
+end
+
+// F4-3 (Nivo 2/CEP): Prosječna temperatura dima < 60°C (simulacija 15-min prozora)
+rule "F4-3 CEP Nedovoljna termička obrada u 15-min prozoru"
+    salience 90
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.DIMLJENJE,
+            status != StatusSerije.BLOKIRANA,
+            temperaturaDima < 60.0
+        )
+    then
+        $s.dodajUpozorenje("F4-3: NedovoljnaTermObrada15min - prosječna temperatura dima = " + $s.getTemperaturaDima() + "°C (< 60°C u 15-min prozoru)");
+        update($s);
+end
+
+// F4-4 (Nivo 2/CEP ulančavanje): Nedovoljna termička obrada u 3+ uzastopna 15-min prozora (= 45 min)
+// Simulacija: ako je F4-3 upozorenje aktivno i temperatura i dalje < 60°C → kritično
+rule "F4-4 CEP Nedovoljna termička obrada 45+ minuta - kritično"
+    salience 85
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.DIMLJENJE,
+            status != StatusSerije.BLOKIRANA,
+            temperaturaDima < 60.0,
+            eval($s.imaAktivnoUpozorenje("F4-3: NedovoljnaTermObrada15min - prosječna temperatura dima = " + $s.getTemperaturaDima() + "°C (< 60°C u 15-min prozoru)"))
+        )
+    then
+        $s.dodajUpozorenje("F4-4: NedovoljnaTermickaObrada - temperatura dima < 60°C u 3+ uzastopna 15-min prozora (ukupno ≥ 45 min). KRITIČNO!");
+        update($s);
+end
+
+// F4-5 (Nivo 3): NedovoljnaTermickaObrada → blokada
+rule "F4-5 Dimljenje failed - blokada"
+    salience 75
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.DIMLJENJE,
+            status != StatusSerije.BLOKIRANA,
+            eval($s.imaAktivnoUpozorenje("F4-4: NedovoljnaTermickaObrada - temperatura dima < 60°C u 3+ uzastopna 15-min prozora (ukupno ≥ 45 min). KRITIČNO!"))
+        )
+    then
+        $s.blokiraj("F4-5: DimljenjeFailed - nedovoljna termička obrada. Preporučuje se ponovljeno dimljenje ili odbacivanje serije.");
+        update($s);
+end
+
+// F4-6 (Nivo 2): Ukupno trajanje dimljenja > 10h → upozorenje
+rule "F4-6 Trajanje dimljenja predugo"
+    salience 90
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.DIMLJENJE,
+            status != StatusSerije.BLOKIRANA,
+            trajanjeDimljenjaH > 10
+        )
+    then
+        $s.dodajUpozorenje("F4-6: TrajanjeDimljenjaPredugo - trajanje = " + $s.getTrajanjeDimljenjaH() + "h (> 10h, prekomerna obrada)");
+        update($s);
+end
+
+// F4-7 (Nivo 3): Temperatura u opsegu + trajanje 4–8h + nema blokada → DimljenjeUspesno
+rule "F4-7 Dimljenje uspešno - napredak u Fazu 5"
+    salience 10
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.DIMLJENJE,
+            status != StatusSerije.BLOKIRANA,
+            temperaturaDima >= 60.0,
+            temperaturaDima <= 85.0,
+            trajanjeDimljenjaH >= 4,
+            trajanjeDimljenjaH <= 8
+        )
+    then
+        $s.getLog().add("[NAPREDAK] DimljenjeUspesno. Serija napreduje u Fazu 5 – Sušenje/Zrenje.");
+        System.out.println("  >> NAPREDAK [" + $s.getId() + "]: Faza 4 OK → Faza 5");
+        $s.setTrenutnaFaza(FazaProizvodnje.SUSENJE_ZRENJE);
+        update($s);
+end

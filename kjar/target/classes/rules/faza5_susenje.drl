@@ -1,0 +1,139 @@
+package com.ftn.sbnz.rules;
+
+import com.ftn.sbnz.model.Serija;
+import com.ftn.sbnz.model.StatusSerije;
+import com.ftn.sbnz.model.FazaProizvodnje;
+import com.ftn.sbnz.model.PraviloGubitakTezine;
+
+// ============================================================
+//  FAZA 5 – SUŠENJE I ZRENJE (forward chaining + Template + CEP)
+// ============================================================
+
+// F5-1 (Nivo 1): Gubitak težine posle nedelje 2 < 8% (prenizak)
+rule "F5-1 Gubitak težine prespor posle nedelje 2"
+    salience 100
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SUSENJE_ZRENJE,
+            status != StatusSerije.BLOKIRANA,
+            eval($s.getGubitakPosleNedelje(2) >= 0 && $s.getGubitakPosleNedelje(2) < 8.0)
+        )
+    then
+        $s.dodajUpozorenje("F5-1: GubitekTezinePrespor - gubitak posle nedelje 2 = " +
+            String.format("%.1f", $s.getGubitakPosleNedelje(2)) + "% (< 8%, loši uslovi sušenja)");
+        update($s);
+end
+
+// F5-2 (Nivo 1): Gubitak težine posle nedelje 2 > 20% (prebrz)
+rule "F5-2 Gubitak težine prebrz posle nedelje 2"
+    salience 100
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SUSENJE_ZRENJE,
+            status != StatusSerije.BLOKIRANA,
+            eval($s.getGubitakPosleNedelje(2) > 20.0)
+        )
+    then
+        $s.dodajUpozorenje("F5-2: GubitekTezinePrebrz - gubitak posle nedelje 2 = " +
+            String.format("%.1f", $s.getGubitakPosleNedelje(2)) + "% (> 20%, prebrzo sušenje - puca kora!)");
+        update($s);
+end
+
+// F5-3 (Nivo 1): Temperatura sušare > 18°C
+rule "F5-3 Temperatura sušare previsoka"
+    salience 100
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SUSENJE_ZRENJE,
+            status != StatusSerije.BLOKIRANA,
+            temperaturaSusare > 18.0
+        )
+    then
+        $s.dodajUpozorenje("F5-3: TempSusarePrevisoka - temperatura sušare = " + $s.getTemperaturaSusare() + "°C (> 18°C)");
+        update($s);
+end
+
+// F5-4 (Nivo 1): Vlažnost sušare van opsega 70–90%
+rule "F5-4 Vlažnost sušare van opsega"
+    salience 100
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SUSENJE_ZRENJE,
+            status != StatusSerije.BLOKIRANA,
+            eval($s.getVlaznostSusare() < 70.0 || $s.getVlaznostSusare() > 90.0)
+        )
+    then
+        $s.dodajUpozorenje("F5-4: VlaznostSusareVanOpsega - vlažnost = " + $s.getVlaznostSusare() + "% (opseg: 70–90%)");
+        update($s);
+end
+
+// F5-5 (Nivo 2/CEP): Temperatura sušare > 16°C prosječno u 4h prozoru → eskalacija
+rule "F5-5 CEP Trajni temperaturni rizik sušenja"
+    salience 90
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SUSENJE_ZRENJE,
+            status != StatusSerije.BLOKIRANA,
+            temperaturaSusare > 16.0,
+            eval($s.imaAktivnoUpozorenje("F5-3: TempSusarePrevisoka - temperatura sušare = " + $s.getTemperaturaSusare() + "°C (> 18°C)"))
+        )
+    then
+        $s.dodajUpozorenje("F5-5: TrajniTemperaturniRizikSusenja - prosječna temperatura > 16°C u 4h prozoru. Eskalacija!");
+        update($s);
+end
+
+// F5-6 (Nivo 2): GubitekTezinePrespor I TrajniTemperaturniRizik → SusenjeUgrozeno
+rule "F5-6 Sušenje ugrozeno - kombinirani rizici"
+    salience 80
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SUSENJE_ZRENJE,
+            status != StatusSerije.BLOKIRANA,
+            eval($s.imaAktivnoUpozorenje("F5-5: TrajniTemperaturniRizikSusenja - prosječna temperatura > 16°C u 4h prozoru. Eskalacija!") &&
+                 ($s.getGubitakPosleNedelje(2) >= 0 && $s.getGubitakPosleNedelje(2) < 8.0))
+        )
+    then
+        $s.dodajUpozorenje("F5-6: SusenjeUgrozeno - spor gubitak težine I temperaturni rizik. Preporučuje se korekcija temperature i vlažnosti.");
+        update($s);
+end
+
+// F5-7 (Template/Nivo 2): Ukupni gubitak < min_gubitak po tipu → ZrenjeNijeZavrseno
+rule "F5-7 Template Zrenje nije završeno - gubitak ispod minimuma"
+    salience 85
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SUSENJE_ZRENJE,
+            status != StatusSerije.BLOKIRANA
+        )
+        $p : PraviloGubitakTezine(
+            tipProizvoda == $s.tipProizvoda,
+            eval($s.getGubitakTezinaPoNedeljama().size() >= rokNedelje &&
+                 $s.getUkupniGubitakTezine() < minGubitakPct)
+        )
+    then
+        $s.dodajUpozorenje("F5-7: ZrenjeNijeZavrseno - ukupni gubitak = " +
+            String.format("%.1f", $s.getUkupniGubitakTezine()) +
+            "% (minimum za " + $s.getTipProizvoda() + ": " + $p.getMinGubitakPct() + "% posle " + $p.getRokNedelje() + " nedelja). Blokada napretka.");
+        update($s);
+end
+
+// F5-8 (Nivo 3): Ukupni gubitak u opsegu + nema blokada → ZrenjeZavrseno
+rule "F5-8 Zrenje završeno - napredak u Fazu 6"
+    salience 10
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SUSENJE_ZRENJE,
+            status != StatusSerije.BLOKIRANA,
+            eval($s.getUkupniGubitakTezine() >= 25.0 && $s.getUkupniGubitakTezine() <= 35.0)
+        )
+        not PraviloGubitakTezine(
+            tipProizvoda == $s.tipProizvoda,
+            eval($s.getGubitakTezinaPoNedeljama().size() >= rokNedelje &&
+                 $s.getUkupniGubitakTezine() < minGubitakPct)
+        )
+    then
+        $s.getLog().add("[NAPREDAK] ZrenjeZavrseno. Serija napreduje u Fazu 6 – Finalna kontrola.");
+        System.out.println("  >> NAPREDAK [" + $s.getId() + "]: Faza 5 OK → Faza 6");
+        $s.setTrenutnaFaza(FazaProizvodnje.FINALNA_KONTROLA);
+        update($s);
+end

@@ -1,0 +1,122 @@
+package com.ftn.sbnz.rules;
+
+import com.ftn.sbnz.model.Serija;
+import com.ftn.sbnz.model.StatusSerije;
+import com.ftn.sbnz.model.FazaProizvodnje;
+import com.ftn.sbnz.model.PraviloSoli;
+import com.ftn.sbnz.model.TipProizvoda;
+
+// ============================================================
+//  FAZA 2 – SALAMURENJE
+// ============================================================
+
+// F2-1 (Nivo 1): Sol < 1.8% → blokada (min. bezbedna vrednost)
+rule "F2-1 Sol ispod minimalne bezbedne vrednosti"
+    salience 100
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SALAMURENJE,
+            status != StatusSerije.BLOKIRANA,
+            procenatSoli < 1.8
+        )
+    then
+        $s.blokiraj("F2-1: Sol = " + $s.getProcenatSoli() + "% - ispod minimuma bezbednosti 1.8%. Serija blokirana.");
+        update($s);
+end
+
+rule "F2-2 Sol van opsega za tip proizvoda (Template)"
+    salience 90
+    no-loop
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SALAMURENJE,
+            status != StatusSerije.BLOKIRANA
+        )
+        $p : PraviloSoli(
+            tipProizvoda == $s.tipProizvoda,
+            eval($s.getProcenatSoli() < minSol || $s.getProcenatSoli() > maxSol)
+        )
+    then
+        $s.dodajUpozorenje("F2-2: SolVanOpsega - sol = " + $s.getProcenatSoli() +
+            "% (opseg za " + $s.getTipProizvoda() + ": " + $p.getMinSol() + "–" + $p.getMaxSol() + "%)");
+        update($s);
+end
+
+rule "F2-3 Temperatura salamure visoka"
+    salience 90
+    no-loop
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SALAMURENJE,
+            status != StatusSerije.BLOKIRANA,
+            temperaturaSalamure > 8.0
+        )
+    then
+        $s.dodajUpozorenje("F2-3: TempSalamureVisoka - temperatura = " + $s.getTemperaturaSalamure() + "°C (> 8°C, zona opasnosti!)");
+        update($s);
+end
+
+rule "F2-4 Temperatura salamure niska"
+    salience 90
+    no-loop
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SALAMURENJE,
+            status != StatusSerije.BLOKIRANA,
+            temperaturaSalamure < 2.0
+        )
+    then
+        $s.dodajUpozorenje("F2-4: TempSalamureNiska - temperatura = " + $s.getTemperaturaSalamure() + "°C (< 2°C)");
+        update($s);
+end
+
+// F2-5 (Nivo 2/CEP): Temperatura visoka aktivna → blokada
+// Simulacija CEP: ako je upozorenje već aktivno (znači trajalo je > prag) → blokada
+rule "F2-5 CEP Temperatura salamure predugo visoka - blokada"
+    salience 80
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SALAMURENJE,
+            status != StatusSerije.BLOKIRANA,
+            eval($s.imaAktivnoUpozorenje("F2-3: TempSalamureVisoka - temperatura = " + $s.getTemperaturaSalamure() + "°C (> 8°C, zona opasnosti!)"))
+        )
+    then
+        $s.blokiraj("F2-5: SalamurenjeFailed - temperatura salamure predugo visoka (> 2h). Rizik od kvarenja.");
+        update($s);
+end
+
+// F2-6 (Nivo 1): Trajanje salamurenja van opsega 24–96h
+rule "F2-6 Trajanje salamurenja nepravilno"
+    salience 85
+    no-loop
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SALAMURENJE,
+            status != StatusSerije.BLOKIRANA,
+            trajanjeSalamurenjaH < 24 || trajanjeSalamurenjaH > 96
+        )
+    then
+        $s.dodajUpozorenje("F2-6: TrajanjeSalamurenjaNeispravno - trajanje = " + $s.getTrajanjeSalamurenjaH() + "h (opseg: 24–96h)");
+        update($s);
+end
+
+// Napredak u Fazu 3
+rule "F2 Serija može napredovati u Fazu 3"
+    salience 10
+    when
+        $s : Serija(
+            trenutnaFaza == FazaProizvodnje.SALAMURENJE,
+            status != StatusSerije.BLOKIRANA,
+            procenatSoli >= 1.8,
+            temperaturaSalamure >= 2.0,
+            temperaturaSalamure <= 8.0,
+            trajanjeSalamurenjaH >= 24,
+            trajanjeSalamurenjaH <= 96,
+            aktivnaUpozorenja.isEmpty() == true
+        )
+    then
+        $s.getLog().add("[NAPREDAK] Faza 2 uspešno završena. Serija napreduje u Fazu 3 – Fermentacija.");
+        System.out.println("  >> NAPREDAK [" + $s.getId() + "]: Faza 2 OK → Faza 3");
+        $s.setTrenutnaFaza(FazaProizvodnje.FERMENTACIJA);
+        update($s);
+end
