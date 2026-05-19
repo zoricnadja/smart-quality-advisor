@@ -10,7 +10,7 @@ import java.time.LocalDate;
 import java.util.Arrays;
 
 /**
- * Servisni sloj koji kreira scenarija i pokreće Drools pravila za sve faze.
+ * Service layer that creates demonstration scenarios and runs Drools rules for all phases.
  */
 @Service
 public class QualityService {
@@ -19,334 +19,283 @@ public class QualityService {
     private KieContainer kieContainer;
 
     /**
-     * Pokreće kompletnu demonstraciju za sve scenarije.
+     * Runs the complete demonstration for all scenarios.
      */
-    public void pokreniDemonstraciju() {
+    public void runDemo() {
         System.out.println("\n" + "=".repeat(70));
-        System.out.println("  SMART QUALITY ADVISOR – Demonstracija forward chaining pravila");
+        System.out.println("  SMART QUALITY ADVISOR - Forward Chaining Rule Demonstration");
         System.out.println("=".repeat(70));
 
-        demonstracijaFaza1();
-        demonstracijaFaza2();
-        demonstracijaFaza3();
-        demonstracijaFaza4();
-        demonstracijaFaza5();
-        demonstracijaFaza6();
-        demonstracijaKompletnaProlaz();
+        demoPhase1();
+        demoPhase2();
+        demoPhase3();
+        demoPhase4();
+        demoPhase5();
+        demoPhase6();
+        demoCompletePass();
 
         System.out.println("\n" + "=".repeat(70));
-        System.out.println("  Demonstracija završena.");
+        System.out.println("  Demonstration finished.");
         System.out.println("=".repeat(70));
     }
 
-    // ============================================================
-    //  SCENARIJ 1 – Faza 1: Prijem sirovine
-    // ============================================================
-    private void demonstracijaFaza1() {
-        System.out.println("\n--- SCENARIJ 1: Faza 1 – Prijem sirovine ---");
+    private void demoPhase1() {
+        System.out.println("\n--- SCENARIO 1: Phase 1 - Raw Material Receiving ---");
 
-        // 1a: pH kritičan > 6.5 → blokada
-        System.out.println("\n[1a] pH > 6.5 → očekivana blokada");
-        Serija s1a = new Serija("SER-001", TipProizvoda.KULEN);
-        s1a.setPhPrijema(6.8);
-        s1a.setTemperaturaPrijema(5.0);
-        s1a.setVizuelnaOcenaPrijema(4);
-        s1a.setRokTrajanjaSirovine(LocalDate.now().plusDays(20));
-        pokreniPravila(s1a, null, null);
-        ispisiRezultat(s1a);
+        System.out.println("\n[1a] pH > 6.5 -> expected block");
+        Batch b1a = new Batch("BATCH-001", ProductType.KULEN);
+        b1a.setReceivingPh(6.8);
+        b1a.setReceivingTemperature(5.0);
+        b1a.setReceivingVisualScore(4);
+        b1a.setRawMaterialShelfLife(LocalDate.now().plusDays(20));
+        runRules(b1a, null, null);
+        printResult(b1a);
 
-        // 1b: Vizuelna ocena < 3 → blokada
-        System.out.println("\n[1b] Vizuelna ocena = 2 → očekivana blokada");
-        Serija s1b = new Serija("SER-002", TipProizvoda.KULEN);
-        s1b.setPhPrijema(5.8);
-        s1b.setTemperaturaPrijema(4.0);
-        s1b.setVizuelnaOcenaPrijema(2);
-        s1b.setRokTrajanjaSirovine(LocalDate.now().plusDays(20));
-        pokreniPravila(s1b, null, null);
-        ispisiRezultat(s1b);
+        System.out.println("\n[1b] Visual score = 2 -> expected block");
+        Batch b1b = new Batch("BATCH-002", ProductType.KULEN);
+        b1b.setReceivingPh(5.8);
+        b1b.setReceivingTemperature(4.0);
+        b1b.setReceivingVisualScore(2);
+        b1b.setRawMaterialShelfLife(LocalDate.now().plusDays(20));
+        runRules(b1b, null, null);
+        printResult(b1b);
 
-        // 1c: Sve OK → napredak u Fazu 2
-        System.out.println("\n[1c] Sve vrednosti OK → očekivani napredak u Fazu 2");
-        Serija s1c = new Serija("SER-003", TipProizvoda.KOBASICA);
-        s1c.setPhPrijema(5.9);
-        s1c.setTemperaturaPrijema(3.5);
-        s1c.setVizuelnaOcenaPrijema(5);
-        s1c.setRokTrajanjaSirovine(LocalDate.now().plusDays(30));
-        pokreniPravila(s1c, null, null);
-        ispisiRezultat(s1c);
+        System.out.println("\n[1c] All values OK -> expected advance to Phase 2");
+        Batch b1c = new Batch("BATCH-003", ProductType.SAUSAGE);
+        b1c.setReceivingPh(5.9);
+        b1c.setReceivingTemperature(3.5);
+        b1c.setReceivingVisualScore(5);
+        b1c.setRawMaterialShelfLife(LocalDate.now().plusDays(30));
+        runRules(b1c, null, null);
+        printResult(b1c);
     }
 
-    // ============================================================
-    //  SCENARIJ 2 – Faza 2: Salamurenje
-    // ============================================================
-    private void demonstracijaFaza2() {
-        System.out.println("\n--- SCENARIJ 2: Faza 2 – Salamurenje ---");
+    private void demoPhase2() {
+        System.out.println("\n--- SCENARIO 2: Phase 2 - Curing ---");
 
-        PraviloSoli praviloKulen = new PraviloSoli(TipProizvoda.KULEN, 2.5, 3.0);
-        PraviloSoli praviloKobasica = new PraviloSoli(TipProizvoda.KOBASICA, 1.8, 2.2);
+        SaltRule kulenSaltRule = new SaltRule(ProductType.KULEN, 2.5, 3.0);
+        SaltRule sausageSaltRule = new SaltRule(ProductType.SAUSAGE, 1.8, 2.2);
 
-        // 2a: Sol < 1.8% → blokada
-        System.out.println("\n[2a] Sol = 1.5% < 1.8% → blokada");
-        Serija s2a = new Serija("SER-010", TipProizvoda.KULEN);
-        s2a.setTrenutnaFaza(FazaProizvodnje.SALAMURENJE);
-        s2a.setProcenatSoli(1.5);
-        s2a.setTemperaturaSalamure(5.0);
-        s2a.setTrajanjeSalamurenjaH(48);
-        pokreniPravila(s2a, praviloKulen, null);
-        ispisiRezultat(s2a);
+        System.out.println("\n[2a] Salt = 1.5% < 1.8% -> block");
+        Batch b2a = new Batch("BATCH-010", ProductType.KULEN);
+        b2a.setCurrentPhase(ProductionPhase.CURING);
+        b2a.setSaltPercentage(1.5);
+        b2a.setBrineTemperature(5.0);
+        b2a.setCuringDurationHours(48);
+        runRules(b2a, kulenSaltRule, null);
+        printResult(b2a);
 
-        // 2b: Sol van opsega za kulen (template)
-        System.out.println("\n[2b] Sol = 2.0% – van opsega za kulen (2.5–3.0%) → upozorenje template");
-        Serija s2b = new Serija("SER-011", TipProizvoda.KULEN);
-        s2b.setTrenutnaFaza(FazaProizvodnje.SALAMURENJE);
-        s2b.setProcenatSoli(2.0);
-        s2b.setTemperaturaSalamure(5.0);
-        s2b.setTrajanjeSalamurenjaH(48);
-        pokreniPravila(s2b, praviloKulen, null);
-        ispisiRezultat(s2b);
+        System.out.println("\n[2b] Salt = 2.0% - outside kulen range (2.5-3.0%) -> template warning");
+        Batch b2b = new Batch("BATCH-011", ProductType.KULEN);
+        b2b.setCurrentPhase(ProductionPhase.CURING);
+        b2b.setSaltPercentage(2.0);
+        b2b.setBrineTemperature(5.0);
+        b2b.setCuringDurationHours(48);
+        runRules(b2b, kulenSaltRule, null);
+        printResult(b2b);
 
-        // 2c: Sve OK za kobasicu
-        System.out.println("\n[2c] Sol = 2.0%, sve u redu za kobasicu → napredak u Fazu 3");
-        Serija s2c = new Serija("SER-012", TipProizvoda.KOBASICA);
-        s2c.setTrenutnaFaza(FazaProizvodnje.SALAMURENJE);
-        s2c.setProcenatSoli(2.0);
-        s2c.setTemperaturaSalamure(5.0);
-        s2c.setTrajanjeSalamurenjaH(48);
-        pokreniPravila(s2c, praviloKobasica, null);
-        ispisiRezultat(s2c);
+        System.out.println("\n[2c] Salt = 2.0%, all OK for sausage -> advance to Phase 3");
+        Batch b2c = new Batch("BATCH-012", ProductType.SAUSAGE);
+        b2c.setCurrentPhase(ProductionPhase.CURING);
+        b2c.setSaltPercentage(2.0);
+        b2c.setBrineTemperature(5.0);
+        b2c.setCuringDurationHours(48);
+        runRules(b2c, sausageSaltRule, null);
+        printResult(b2c);
     }
 
-    // ============================================================
-    //  SCENARIJ 3 – Faza 3: Fermentacija (CEP trend)
-    // ============================================================
-    private void demonstracijaFaza3() {
-        System.out.println("\n--- SCENARIJ 3: Faza 3 – Fermentacija (CEP trend pH) ---");
+    private void demoPhase3() {
+        System.out.println("\n--- SCENARIO 3: Phase 3 - Fermentation (pH trend CEP) ---");
 
-        // 3a: pH dan 5 > 5.3 → fermentacija failed
-        System.out.println("\n[3a] pH dan 5 = 5.7 > 5.3 → blokada");
-        Serija s3a = new Serija("SER-020", TipProizvoda.KULEN);
-        s3a.setTrenutnaFaza(FazaProizvodnje.FERMENTACIJA);
-        s3a.setPhFermentacijePoFazama(Arrays.asList(6.2, 6.0, 5.9, 5.8, 5.7)); // sporo opada
-        s3a.setTemperaturaFermentacijskeKomore(22.0);
-        s3a.setVlaznostFermentacijskeKomore(90.0);
-        pokreniPravila(s3a, null, null);
-        ispisiRezultat(s3a);
+        System.out.println("\n[3a] Day 5 pH = 5.7 > 5.3 -> block");
+        Batch b3a = new Batch("BATCH-020", ProductType.KULEN);
+        b3a.setCurrentPhase(ProductionPhase.FERMENTATION);
+        b3a.setFermentationPhByDay(Arrays.asList(6.2, 6.0, 5.9, 5.8, 5.7));
+        b3a.setFermentationChamberTemperature(22.0);
+        b3a.setFermentationChamberHumidity(90.0);
+        runRules(b3a, null, null);
+        printResult(b3a);
 
-        // 3b: Spor trend (delta < 0.1 dva uzastopna dana) + visoka temperatura → blokada
-        System.out.println("\n[3b] Spor trend pH + temperatura komore > 26°C → blokada");
-        Serija s3b = new Serija("SER-021", TipProizvoda.KULEN);
-        s3b.setTrenutnaFaza(FazaProizvodnje.FERMENTACIJA);
-        s3b.setPhFermentacijePoFazama(Arrays.asList(6.2, 6.13, 6.06, 5.99, 5.92)); // delta ~0.07 svugdje
-        s3b.setTemperaturaFermentacijskeKomore(27.0); // > 26°C
-        s3b.setVlaznostFermentacijskeKomore(90.0);
-        pokreniPravila(s3b, null, null);
-        ispisiRezultat(s3b);
+        System.out.println("\n[3b] Slow pH trend + chamber temperature > 26 C -> block");
+        Batch b3b = new Batch("BATCH-021", ProductType.KULEN);
+        b3b.setCurrentPhase(ProductionPhase.FERMENTATION);
+        b3b.setFermentationPhByDay(Arrays.asList(6.2, 6.13, 6.06, 5.99, 5.92));
+        b3b.setFermentationChamberTemperature(27.0);
+        b3b.setFermentationChamberHumidity(90.0);
+        runRules(b3b, null, null);
+        printResult(b3b);
 
-        // 3c: Sve OK → napredak u Fazu 4
-        System.out.println("\n[3c] pH dan 5 = 5.1, trend OK → napredak u Fazu 4");
-        Serija s3c = new Serija("SER-022", TipProizvoda.KULEN);
-        s3c.setTrenutnaFaza(FazaProizvodnje.FERMENTACIJA);
-        s3c.setPhFermentacijePoFazama(Arrays.asList(6.2, 5.9, 5.6, 5.4, 5.1)); // delta > 0.2 svaki dan
-        s3c.setTemperaturaFermentacijskeKomore(21.0);
-        s3c.setVlaznostFermentacijskeKomore(90.0);
-        pokreniPravila(s3c, null, null);
-        ispisiRezultat(s3c);
+        System.out.println("\n[3c] Day 5 pH = 5.1, trend OK -> advance to Phase 4");
+        Batch b3c = new Batch("BATCH-022", ProductType.KULEN);
+        b3c.setCurrentPhase(ProductionPhase.FERMENTATION);
+        b3c.setFermentationPhByDay(Arrays.asList(6.2, 5.9, 5.6, 5.4, 5.1));
+        b3c.setFermentationChamberTemperature(21.0);
+        b3c.setFermentationChamberHumidity(90.0);
+        runRules(b3c, null, null);
+        printResult(b3c);
     }
 
-    // ============================================================
-    //  SCENARIJ 4 – Faza 4: Dimljenje (CEP agregacija)
-    // ============================================================
-    private void demonstracijaFaza4() {
-        System.out.println("\n--- SCENARIJ 4: Faza 4 – Dimljenje (CEP agregacija temperature) ---");
+    private void demoPhase4() {
+        System.out.println("\n--- SCENARIO 4: Phase 4 - Smoking (temperature aggregation CEP) ---");
 
-        // 4a: Temperatura < 60°C → nedovoljna termička obrada → blokada
-        System.out.println("\n[4a] Temp dima = 55°C < 60°C → blokada (nedovoljna termička obrada)");
-        Serija s4a = new Serija("SER-030", TipProizvoda.KULEN);
-        s4a.setTrenutnaFaza(FazaProizvodnje.DIMLJENJE);
-        s4a.setTemperaturaDima(55.0);
-        s4a.setTrajanjeDimljenjaH(6);
-        pokreniPravila(s4a, null, null);
-        ispisiRezultat(s4a);
+        System.out.println("\n[4a] Smoke temperature = 55 C < 60 C -> block (insufficient heat treatment)");
+        Batch b4a = new Batch("BATCH-030", ProductType.KULEN);
+        b4a.setCurrentPhase(ProductionPhase.SMOKING);
+        b4a.setSmokeTemperature(55.0);
+        b4a.setSmokingDurationHours(6);
+        runRules(b4a, null, null);
+        printResult(b4a);
 
-        // 4b: Trajanje > 10h → upozorenje
-        System.out.println("\n[4b] Trajanje = 12h > 10h → upozorenje prekomerne obrade");
-        Serija s4b = new Serija("SER-031", TipProizvoda.KULEN);
-        s4b.setTrenutnaFaza(FazaProizvodnje.DIMLJENJE);
-        s4b.setTemperaturaDima(72.0);
-        s4b.setTrajanjeDimljenjaH(12);
-        pokreniPravila(s4b, null, null);
-        ispisiRezultat(s4b);
+        System.out.println("\n[4b] Duration = 12h > 10h -> excessive processing warning");
+        Batch b4b = new Batch("BATCH-031", ProductType.KULEN);
+        b4b.setCurrentPhase(ProductionPhase.SMOKING);
+        b4b.setSmokeTemperature(72.0);
+        b4b.setSmokingDurationHours(12);
+        runRules(b4b, null, null);
+        printResult(b4b);
 
-        // 4c: Sve OK → napredak u Fazu 5
-        System.out.println("\n[4c] Temp = 72°C, trajanje = 6h → napredak u Fazu 5");
-        Serija s4c = new Serija("SER-032", TipProizvoda.KULEN);
-        s4c.setTrenutnaFaza(FazaProizvodnje.DIMLJENJE);
-        s4c.setTemperaturaDima(72.0);
-        s4c.setTrajanjeDimljenjaH(6);
-        pokreniPravila(s4c, null, null);
-        ispisiRezultat(s4c);
+        System.out.println("\n[4c] Temperature = 72 C, duration = 6h -> advance to Phase 5");
+        Batch b4c = new Batch("BATCH-032", ProductType.KULEN);
+        b4c.setCurrentPhase(ProductionPhase.SMOKING);
+        b4c.setSmokeTemperature(72.0);
+        b4c.setSmokingDurationHours(6);
+        runRules(b4c, null, null);
+        printResult(b4c);
     }
 
-    // ============================================================
-    //  SCENARIJ 5 – Faza 5: Sušenje/Zrenje (Template gubitak)
-    // ============================================================
-    private void demonstracijaFaza5() {
-        System.out.println("\n--- SCENARIJ 5: Faza 5 – Sušenje/Zrenje (Template gubitak težine) ---");
+    private void demoPhase5() {
+        System.out.println("\n--- SCENARIO 5: Phase 5 - Drying/Aging (weight-loss template) ---");
 
-        PraviloGubitakTezine praviloKulen = new PraviloGubitakTezine(TipProizvoda.KULEN, 30.0, 8);
+        WeightLossRule kulenWeightLossRule = new WeightLossRule(ProductType.KULEN, 30.0, 8);
 
-        // 5a: Ukupni gubitak < 30% posle 8 nedelja → blokada (template)
-        System.out.println("\n[5a] Gubitak = 22% < 30% za kulen → blokada napretka (template)");
-        Serija s5a = new Serija("SER-040", TipProizvoda.KULEN);
-        s5a.setTrenutnaFaza(FazaProizvodnje.SUSENJE_ZRENJE);
-        s5a.setGubitakTezinaPoNedeljama(Arrays.asList(3.0, 5.0, 8.0, 11.0, 13.0, 16.0, 19.0, 22.0));
-        s5a.setTemperaturaSusare(14.0);
-        s5a.setVlaznostSusare(80.0);
-        pokreniPravila(s5a, null, praviloKulen);
-        ispisiRezultat(s5a);
+        System.out.println("\n[5a] Weight loss = 22% < 30% for kulen -> progress blocked (template)");
+        Batch b5a = new Batch("BATCH-040", ProductType.KULEN);
+        b5a.setCurrentPhase(ProductionPhase.DRYING_AGING);
+        b5a.setWeeklyWeightLossPercentages(Arrays.asList(3.0, 5.0, 8.0, 11.0, 13.0, 16.0, 19.0, 22.0));
+        b5a.setDryingRoomTemperature(14.0);
+        b5a.setDryingRoomHumidity(80.0);
+        runRules(b5a, null, kulenWeightLossRule);
+        printResult(b5a);
 
-        // 5b: Sve OK (gubitak = 32%) → napredak u Fazu 6
-        System.out.println("\n[5b] Gubitak = 32% ≥ 30%, sve OK → napredak u Fazu 6");
-        Serija s5b = new Serija("SER-041", TipProizvoda.KULEN);
-        s5b.setTrenutnaFaza(FazaProizvodnje.SUSENJE_ZRENJE);
-        s5b.setGubitakTezinaPoNedeljama(Arrays.asList(4.0, 8.0, 13.0, 18.0, 22.0, 26.0, 29.0, 32.0));
-        s5b.setTemperaturaSusare(14.0);
-        s5b.setVlaznostSusare(80.0);
-        pokreniPravila(s5b, null, praviloKulen);
-        ispisiRezultat(s5b);
+        System.out.println("\n[5b] Weight loss = 32% >= 30%, all OK -> advance to Phase 6");
+        Batch b5b = new Batch("BATCH-041", ProductType.KULEN);
+        b5b.setCurrentPhase(ProductionPhase.DRYING_AGING);
+        b5b.setWeeklyWeightLossPercentages(Arrays.asList(4.0, 8.0, 13.0, 18.0, 22.0, 26.0, 29.0, 32.0));
+        b5b.setDryingRoomTemperature(14.0);
+        b5b.setDryingRoomHumidity(80.0);
+        runRules(b5b, null, kulenWeightLossRule);
+        printResult(b5b);
     }
 
-    // ============================================================
-    //  SCENARIJ 6 – Faza 6: Finalna kontrola
-    // ============================================================
-    private void demonstracijaFaza6() {
-        System.out.println("\n--- SCENARIJ 6: Faza 6 – Finalna kontrola ---");
+    private void demoPhase6() {
+        System.out.println("\n--- SCENARIO 6: Phase 6 - Final Inspection ---");
 
-        // 6a: pH > 5.3 → blokada
-        System.out.println("\n[6a] pH finalnog = 5.5 → blokada");
-        Serija s6a = new Serija("SER-050", TipProizvoda.KULEN);
-        s6a.setTrenutnaFaza(FazaProizvodnje.FINALNA_KONTROLA);
-        s6a.setPhFinalnog(5.5);
-        s6a.setAwVrednost(0.88);
-        s6a.setVizuelnaOcenaFinalnog(4);
-        pokreniPravila(s6a, null, null);
-        ispisiRezultat(s6a);
+        System.out.println("\n[6a] Final pH = 5.5 -> block");
+        Batch b6a = new Batch("BATCH-050", ProductType.KULEN);
+        b6a.setCurrentPhase(ProductionPhase.FINAL_INSPECTION);
+        b6a.setFinalPh(5.5);
+        b6a.setWaterActivity(0.88);
+        b6a.setFinalVisualScore(4);
+        runRules(b6a, null, null);
+        printResult(b6a);
 
-        // 6b: aw > 0.92 → blokada
-        System.out.println("\n[6b] aw = 0.95 → blokada");
-        Serija s6b = new Serija("SER-051", TipProizvoda.KULEN);
-        s6b.setTrenutnaFaza(FazaProizvodnje.FINALNA_KONTROLA);
-        s6b.setPhFinalnog(5.1);
-        s6b.setAwVrednost(0.95);
-        s6b.setVizuelnaOcenaFinalnog(4);
-        pokreniPravila(s6b, null, null);
-        ispisiRezultat(s6b);
+        System.out.println("\n[6b] aw = 0.95 -> block");
+        Batch b6b = new Batch("BATCH-051", ProductType.KULEN);
+        b6b.setCurrentPhase(ProductionPhase.FINAL_INSPECTION);
+        b6b.setFinalPh(5.1);
+        b6b.setWaterActivity(0.95);
+        b6b.setFinalVisualScore(4);
+        runRules(b6b, null, null);
+        printResult(b6b);
 
-        // 6c: Sve OK → odobrena
-        System.out.println("\n[6c] Sve OK → serija odobrena");
-        Serija s6c = new Serija("SER-052", TipProizvoda.KULEN);
-        s6c.setTrenutnaFaza(FazaProizvodnje.FINALNA_KONTROLA);
-        s6c.setPhFinalnog(4.9);
-        s6c.setAwVrednost(0.87);
-        s6c.setVizuelnaOcenaFinalnog(5);
-        pokreniPravila(s6c, null, null);
-        ispisiRezultat(s6c);
+        System.out.println("\n[6c] All OK -> batch approved");
+        Batch b6c = new Batch("BATCH-052", ProductType.KULEN);
+        b6c.setCurrentPhase(ProductionPhase.FINAL_INSPECTION);
+        b6c.setFinalPh(4.9);
+        b6c.setWaterActivity(0.87);
+        b6c.setFinalVisualScore(5);
+        runRules(b6c, null, null);
+        printResult(b6c);
     }
 
-    // ============================================================
-    //  SCENARIJ 7 – Kompletan prolaz kroz sve faze
-    // ============================================================
-    private void demonstracijaKompletnaProlaz() {
-        System.out.println("\n--- SCENARIJ 7: Kompletan prolaz serije SER-2025-042 kroz sve faze ---");
-        System.out.println("    (Ovo je serija iz backward chaining primjera u projektu)");
+    private void demoCompletePass() {
+        System.out.println("\n--- SCENARIO 7: Complete pass for batch BATCH-2025-042 through all phases ---");
+        System.out.println("    (This is the batch used in the project's backward chaining example.)");
 
         KieSession ks = kieContainer.newKieSession("ksession-rules");
+        ks.insert(new SaltRule(ProductType.KULEN, 2.5, 3.0));
+        ks.insert(new WeightLossRule(ProductType.KULEN, 30.0, 8));
 
-        // Template pravila
-        ks.insert(new PraviloSoli(TipProizvoda.KULEN, 2.5, 3.0));
-        ks.insert(new PraviloGubitakTezine(TipProizvoda.KULEN, 30.0, 8));
+        Batch batch = new Batch("BATCH-2025-042", ProductType.KULEN);
 
-        Serija serija = new Serija("SER-2025-042", TipProizvoda.KULEN);
-
-        // Faza 1: Prijem – sve OK
-        System.out.println("\n[Faza 1] Prijem sirovine...");
-        serija.setPhPrijema(5.9);
-        serija.setTemperaturaPrijema(4.0);
-        serija.setVizuelnaOcenaPrijema(4);
-        serija.setRokTrajanjaSirovine(LocalDate.now().plusDays(25));
-        ks.insert(serija);
+        System.out.println("\n[Phase 1] Raw material receiving...");
+        batch.setReceivingPh(5.9);
+        batch.setReceivingTemperature(4.0);
+        batch.setReceivingVisualScore(4);
+        batch.setRawMaterialShelfLife(LocalDate.now().plusDays(25));
+        ks.insert(batch);
         ks.fireAllRules();
-        System.out.println("    Status: " + serija.getStatus() + " | Faza: " + serija.getTrenutnaFaza());
+        System.out.println("    Status: " + batch.getStatus() + " | Phase: " + batch.getCurrentPhase());
 
-        // Faza 2: Salamurenje – sol OK za kulen
-        System.out.println("\n[Faza 2] Salamurenje...");
-        serija.setProcenatSoli(2.8);
-        serija.setTemperaturaSalamure(5.0);
-        serija.setTrajanjeSalamurenjaH(48);
-        ks.update(ks.getFactHandle(serija), serija);
+        System.out.println("\n[Phase 2] Curing...");
+        batch.setSaltPercentage(2.8);
+        batch.setBrineTemperature(5.0);
+        batch.setCuringDurationHours(48);
+        ks.update(ks.getFactHandle(batch), batch);
         ks.fireAllRules();
-        System.out.println("    Status: " + serija.getStatus() + " | Faza: " + serija.getTrenutnaFaza());
+        System.out.println("    Status: " + batch.getStatus() + " | Phase: " + batch.getCurrentPhase());
 
-        // Faza 3: Fermentacija – pH pada dobro
-        System.out.println("\n[Faza 3] Fermentacija...");
-        serija.setPhFermentacijePoFazama(Arrays.asList(6.2, 5.9, 5.6, 5.35, 5.1));
-        serija.setTemperaturaFermentacijskeKomore(21.0);
-        serija.setVlaznostFermentacijskeKomore(90.0);
-        ks.update(ks.getFactHandle(serija), serija);
+        System.out.println("\n[Phase 3] Fermentation...");
+        batch.setFermentationPhByDay(Arrays.asList(6.2, 5.9, 5.6, 5.35, 5.1));
+        batch.setFermentationChamberTemperature(21.0);
+        batch.setFermentationChamberHumidity(90.0);
+        ks.update(ks.getFactHandle(batch), batch);
         ks.fireAllRules();
-        System.out.println("    Status: " + serija.getStatus() + " | Faza: " + serija.getTrenutnaFaza());
+        System.out.println("    Status: " + batch.getStatus() + " | Phase: " + batch.getCurrentPhase());
 
-        // Faza 4: Dimljenje – sve u redu
-        System.out.println("\n[Faza 4] Dimljenje...");
-        serija.setTemperaturaDima(70.0);
-        serija.setTrajanjeDimljenjaH(5);
-        ks.update(ks.getFactHandle(serija), serija);
+        System.out.println("\n[Phase 4] Smoking...");
+        batch.setSmokeTemperature(70.0);
+        batch.setSmokingDurationHours(5);
+        ks.update(ks.getFactHandle(batch), batch);
         ks.fireAllRules();
-        System.out.println("    Status: " + serija.getStatus() + " | Faza: " + serija.getTrenutnaFaza());
+        System.out.println("    Status: " + batch.getStatus() + " | Phase: " + batch.getCurrentPhase());
 
-        // Faza 5: Sušenje – gubitak 32%
-        System.out.println("\n[Faza 5] Sušenje/Zrenje...");
-        serija.setGubitakTezinaPoNedeljama(Arrays.asList(4.0, 9.0, 14.0, 18.0, 22.0, 26.0, 29.0, 32.0));
-        serija.setTemperaturaSusare(14.0);
-        serija.setVlaznostSusare(80.0);
-        ks.update(ks.getFactHandle(serija), serija);
+        System.out.println("\n[Phase 5] Drying/Aging...");
+        batch.setWeeklyWeightLossPercentages(Arrays.asList(4.0, 9.0, 14.0, 18.0, 22.0, 26.0, 29.0, 32.0));
+        batch.setDryingRoomTemperature(14.0);
+        batch.setDryingRoomHumidity(80.0);
+        ks.update(ks.getFactHandle(batch), batch);
         ks.fireAllRules();
-        System.out.println("    Status: " + serija.getStatus() + " | Faza: " + serija.getTrenutnaFaza());
+        System.out.println("    Status: " + batch.getStatus() + " | Phase: " + batch.getCurrentPhase());
 
-        // Faza 6: Finalna kontrola – sve OK
-        System.out.println("\n[Faza 6] Finalna kontrola...");
-        serija.setPhFinalnog(4.95);
-        serija.setAwVrednost(0.88);
-        serija.setVizuelnaOcenaFinalnog(5);
-        ks.update(ks.getFactHandle(serija), serija);
+        System.out.println("\n[Phase 6] Final inspection...");
+        batch.setFinalPh(4.95);
+        batch.setWaterActivity(0.88);
+        batch.setFinalVisualScore(5);
+        ks.update(ks.getFactHandle(batch), batch);
         ks.fireAllRules();
-
         ks.dispose();
 
-        System.out.println("\n[REZULTAT] Status: " + serija.getStatus() + " | Faza: " + serija.getTrenutnaFaza());
+        System.out.println("\n[RESULT] Status: " + batch.getStatus() + " | Phase: " + batch.getCurrentPhase());
         System.out.println("[LOG]:");
-        serija.getLog().forEach(l -> System.out.println("    " + l));
+        batch.getLog().forEach(line -> System.out.println("    " + line));
     }
 
-    // ============================================================
-    //  Helper metode
-    // ============================================================
-
-    private void pokreniPravila(Serija serija, PraviloSoli praviloSoli, PraviloGubitakTezine praviloGubitak) {
+    private void runRules(Batch batch, SaltRule saltRule, WeightLossRule weightLossRule) {
         KieSession ks = kieContainer.newKieSession("ksession-rules");
-        ks.insert(serija);
-        if (praviloSoli != null) ks.insert(praviloSoli);
-        if (praviloGubitak != null) ks.insert(praviloGubitak);
+        ks.insert(batch);
+        if (saltRule != null) ks.insert(saltRule);
+        if (weightLossRule != null) ks.insert(weightLossRule);
         ks.fireAllRules();
         ks.dispose();
     }
 
-    private void ispisiRezultat(Serija s) {
-        System.out.println("    STATUS: " + s.getStatus() + " | FAZA: " + s.getTrenutnaFaza());
-        if (!s.getAktivnaUpozorenja().isEmpty()) {
-            System.out.println("    Upozorenja:");
-            s.getAktivnaUpozorenja().forEach(u -> System.out.println("      - " + u));
+    private void printResult(Batch batch) {
+        System.out.println("    STATUS: " + batch.getStatus() + " | PHASE: " + batch.getCurrentPhase());
+        if (!batch.getActiveAlerts().isEmpty()) {
+            System.out.println("    Alerts:");
+            batch.getActiveAlerts().forEach(alert -> System.out.println("      - " + alert));
         }
-        System.out.println("    Log: " + s.getLog());
+        System.out.println("    Log: " + batch.getLog());
     }
 }

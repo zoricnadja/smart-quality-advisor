@@ -15,11 +15,11 @@ public class QualityController {
 
     /**
      * GET /api/quality/demo
-     * Pokreće kompletnu demonstraciju svih scenarija.
+     * Runs the full demonstration for all scenarios.
      */
     @GetMapping("/demo")
-    public String pokreniDemo() {
-        qualityService.pokreniDemonstraciju();
-        return "Demonstracija završena. Pogledajte konzolu za rezultate.";
+    public String runDemo() {
+        qualityService.runDemo();
+        return "Demonstration finished. Check the console for results.";
     }
 }

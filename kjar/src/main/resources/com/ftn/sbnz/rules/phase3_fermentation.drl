@@ -1,0 +1,224 @@
+package com.ftn.sbnz.rules;
+
+import com.ftn.sbnz.model.Batch;
+import com.ftn.sbnz.model.BatchStatus;
+import com.ftn.sbnz.model.ProductionPhase;
+
+// ============================================================
+//  PHASE 3 - FERMENTATION (forward chaining + pH trend CEP)
+// ============================================================
+
+// F3-0 Guard: fermentation has started but not enough pH entries are available yet.
+rule "F3-0 Guard - insufficient pH entries for evaluation"
+    salience 200
+    no-loop
+    when
+        $b : Batch(
+            currentPhase == ProductionPhase.FERMENTATION,
+            status != BatchStatus.BLOCKED
+        )
+        eval($b.getFermentationPhByDay().size() < 5)
+    then
+        if (!$b.hasActiveAlert("F3-0: InsufficientPhEntries")) {
+            $b.addAlert("F3-0: InsufficientPhEntries - 5 daily pH entries are required (current: "
+                + $b.getFermentationPhByDay().size() + "). Fermentation is in progress.");
+            update($b);
+        }
+end
+
+// F3-1 (Level 1): day 1 pH > 6.0
+rule "F3-1 Fermentation pH high on day 1"
+    salience 100
+    no-loop
+    when
+        $b : Batch(
+            currentPhase == ProductionPhase.FERMENTATION,
+            status != BatchStatus.BLOCKED
+        )
+        eval(!$b.getActiveAlerts().toString().contains("F3-1:"))
+        eval($b.getPhOnDay(1) > 6.0 && $b.getPhOnDay(1) > 0)
+    then
+        $b.addAlert("F3-1: FermentationPhHigh_D1 - day 1 pH = " + $b.getPhOnDay(1) + " (> 6.0, fermentation is starting slowly)");
+        update($b);
+end
+
+// F3-2 (Level 1): day 3 pH > 5.6
+rule "F3-2 Fermentation pH high on day 3"
+    salience 100
+    no-loop
+    when
+        $b : Batch(
+            currentPhase == ProductionPhase.FERMENTATION,
+            status != BatchStatus.BLOCKED
+        )
+        eval(!$b.getActiveAlerts().toString().contains("F3-2:"))
+        eval($b.getPhOnDay(3) > 5.6 && $b.getPhOnDay(3) > 0)
+    then
+        $b.addAlert("F3-2: FermentationPhHigh_D3 - day 3 pH = " + $b.getPhOnDay(3) + " (> 5.6, fermentation is lagging)");
+        update($b);
+end
+
+// F3-3 (Level 1): day 5 pH > 5.3 -> failed fermentation
+rule "F3-3 Fermentation pH critical on day 5"
+    salience 100
+    no-loop
+    when
+        $b : Batch(
+            currentPhase == ProductionPhase.FERMENTATION,
+            status != BatchStatus.BLOCKED
+        )
+        eval(!$b.getActiveAlerts().toString().contains("F3-3:"))
+        eval($b.getFermentationPhByDay().size() == 5 &&
+             $b.getPhOnDay(5) > 5.3 && $b.getPhOnDay(5) > 0)
+    then
+        $b.addAlert("F3-3: FermentationPhFailed - day 5 pH = " + $b.getPhOnDay(5) + " (> 5.3, fermentation failed)");
+        update($b);
+end
+
+// F3-4 (Level 1): day 5 pH between 5.3 and 5.6 -> extension recommended
+rule "F3-4 Fermentation pH borderline on day 5"
+    salience 95
+    no-loop
+    when
+        $b : Batch(
+            currentPhase == ProductionPhase.FERMENTATION,
+            status != BatchStatus.BLOCKED
+        )
+        eval(!$b.getActiveAlerts().toString().contains("F3-4:"))
+        eval($b.getFermentationPhByDay().size() == 5 &&
+             $b.getPhOnDay(5) > 5.3 && $b.getPhOnDay(5) <= 5.6 && $b.getPhOnDay(5) > 0)
+    then
+        $b.addAlert("F3-4: FermentationPhBorderline - day 5 pH = " + $b.getPhOnDay(5) + ". Extend fermentation by 1-2 days.");
+        update($b);
+end
+
+rule "F3-5 CEP pH trend drops too slowly - day 2"
+    salience 90
+    no-loop
+    when
+        $b : Batch(currentPhase == ProductionPhase.FERMENTATION, status != BatchStatus.BLOCKED)
+        eval(!$b.getActiveAlerts().toString().contains("F3-5: PhTrendDropsTooSlowly_D2"))
+        eval($b.getFermentationPhByDay().size() == 5 &&
+             $b.getPhDeltaBetweenDays(2) >= 0 && $b.getPhDeltaBetweenDays(2) < 0.1 && $b.getPhOnDay(2) > 0)
+    then
+        $b.addAlert("F3-5: PhTrendDropsTooSlowly_D2 - pH delta day 1->2 = " + String.format("%.2f", $b.getPhDeltaBetweenDays(2)) + " (< 0.1)");
+        update($b);
+end
+
+rule "F3-5 CEP pH trend drops too slowly - day 3"
+    salience 90
+    no-loop
+    when
+        $b : Batch(currentPhase == ProductionPhase.FERMENTATION, status != BatchStatus.BLOCKED)
+        eval(!$b.getActiveAlerts().toString().contains("F3-5: PhTrendDropsTooSlowly_D3"))
+        eval($b.getFermentationPhByDay().size() == 5 &&
+             $b.getPhDeltaBetweenDays(3) >= 0 && $b.getPhDeltaBetweenDays(3) < 0.1 && $b.getPhOnDay(3) > 0)
+    then
+        $b.addAlert("F3-5: PhTrendDropsTooSlowly_D3 - pH delta day 2->3 = " + String.format("%.2f", $b.getPhDeltaBetweenDays(3)) + " (< 0.1)");
+        update($b);
+end
+
+rule "F3-5 CEP pH trend drops too slowly - day 4"
+    salience 90
+    no-loop
+    when
+        $b : Batch(currentPhase == ProductionPhase.FERMENTATION, status != BatchStatus.BLOCKED)
+        eval(!$b.getActiveAlerts().toString().contains("F3-5: PhTrendDropsTooSlowly_D4"))
+        eval($b.getFermentationPhByDay().size() == 5 &&
+             $b.getPhDeltaBetweenDays(4) >= 0 && $b.getPhDeltaBetweenDays(4) < 0.1 && $b.getPhOnDay(4) > 0)
+    then
+        $b.addAlert("F3-5: PhTrendDropsTooSlowly_D4 - pH delta day 3->4 = " + String.format("%.2f", $b.getPhDeltaBetweenDays(4)) + " (< 0.1)");
+        update($b);
+end
+
+rule "F3-5 CEP pH trend drops too slowly - day 5"
+    salience 90
+    no-loop
+    when
+        $b : Batch(currentPhase == ProductionPhase.FERMENTATION, status != BatchStatus.BLOCKED)
+        eval(!$b.getActiveAlerts().toString().contains("F3-5: PhTrendDropsTooSlowly_D5"))
+        eval($b.getFermentationPhByDay().size() == 5 &&
+             $b.getPhDeltaBetweenDays(5) >= 0 && $b.getPhDeltaBetweenDays(5) < 0.1 && $b.getPhOnDay(5) > 0)
+    then
+        $b.addAlert("F3-5: PhTrendDropsTooSlowly_D5 - pH delta day 4->5 = " + String.format("%.2f", $b.getPhDeltaBetweenDays(5)) + " (< 0.1)");
+        update($b);
+end
+
+// F3-6 (Level 2/CEP): two or more consecutive slow trends -> fermentation at risk
+rule "F3-6 CEP Fermentation at risk - slow trend for 2+ days"
+    salience 80
+    no-loop
+    when
+        $b : Batch(currentPhase == ProductionPhase.FERMENTATION, status != BatchStatus.BLOCKED)
+        eval(!$b.getActiveAlerts().toString().contains("F3-6:"))
+        eval(
+            $b.getFermentationPhByDay().size() == 5 &&
+            (
+                ($b.getPhDeltaBetweenDays(2) >= 0 && $b.getPhDeltaBetweenDays(2) < 0.1 && $b.getPhOnDay(2) > 0 &&
+                 $b.getPhDeltaBetweenDays(3) >= 0 && $b.getPhDeltaBetweenDays(3) < 0.1 && $b.getPhOnDay(3) > 0) ||
+                ($b.getPhDeltaBetweenDays(3) >= 0 && $b.getPhDeltaBetweenDays(3) < 0.1 && $b.getPhOnDay(3) > 0 &&
+                 $b.getPhDeltaBetweenDays(4) >= 0 && $b.getPhDeltaBetweenDays(4) < 0.1 && $b.getPhOnDay(4) > 0) ||
+                ($b.getPhDeltaBetweenDays(4) >= 0 && $b.getPhDeltaBetweenDays(4) < 0.1 && $b.getPhOnDay(4) > 0 &&
+                 $b.getPhDeltaBetweenDays(5) >= 0 && $b.getPhDeltaBetweenDays(5) < 0.1 && $b.getPhOnDay(5) > 0)
+            )
+        )
+    then
+        $b.addAlert("F3-6: FermentationAtRisk - slow pH trend for 2+ consecutive days. Check starter culture.");
+        update($b);
+end
+
+// F3-7 (Level 2/CEP): chamber temperature > 26 C -> pathogen risk
+rule "F3-7 CEP Fermentation chamber temperature too high"
+    salience 90
+    no-loop
+    when
+        $b : Batch(
+            currentPhase == ProductionPhase.FERMENTATION,
+            status != BatchStatus.BLOCKED,
+            fermentationChamberTemperature > 26.0
+        )
+        eval(!$b.getActiveAlerts().toString().contains("F3-7:"))
+    then
+        $b.addAlert("F3-7: FermentationTemperatureTooHigh - chamber temperature = " + $b.getFermentationChamberTemperature() + " C (> 26 C, pathogen risk!)");
+        update($b);
+end
+
+// F3-8 (Level 3): Fermentation failed -> block
+rule "F3-8 Fermentation failed - block batch"
+    salience 70
+    no-loop
+    when
+        $b : Batch(currentPhase == ProductionPhase.FERMENTATION, status != BatchStatus.BLOCKED)
+        eval(
+            $b.getFermentationPhByDay().size() == 5 &&
+            (
+                $b.getActiveAlerts().toString().contains("F3-3:") ||
+                ($b.getActiveAlerts().toString().contains("F3-6:") &&
+                 $b.getActiveAlerts().toString().contains("F3-7:"))
+            )
+        )
+    then
+        $b.block("F3-8: FermentationFailed - batch blocked. It cannot advance to Phase 4.");
+        update($b);
+end
+
+// F3-9 (Level 3): day 5 pH < 5.3 and chamber conditions OK -> successful fermentation
+rule "F3-9 Fermentation successful - advance to Phase 4"
+    salience 10
+    when
+        $b : Batch(
+            currentPhase == ProductionPhase.FERMENTATION,
+            status != BatchStatus.BLOCKED,
+            fermentationChamberTemperature >= 18.0,
+            fermentationChamberTemperature <= 24.0,
+            fermentationChamberHumidity >= 85.0,
+            fermentationChamberHumidity <= 95.0
+        )
+        eval($b.getFermentationPhByDay().size() == 5 &&
+             $b.getPhOnDay(5) > 0 && $b.getPhOnDay(5) < 5.3)
+    then
+        $b.getLog().add("[ADVANCE] FermentationSuccessful. Batch advances to Phase 4 - Smoking.");
+        System.out.println("  >> ADVANCE [" + $b.getId() + "]: Phase 3 OK -> Phase 4");
+        $b.setCurrentPhase(ProductionPhase.SMOKING);
+        update($b);
+end
