@@ -1,6 +1,6 @@
-com\ftn\sbnz\model\StatusSerije.class
-com\ftn\sbnz\model\FazaProizvodnje.class
-com\ftn\sbnz\model\PraviloSoli.class
-com\ftn\sbnz\model\Serija.class
-com\ftn\sbnz\model\TipProizvoda.class
-com\ftn\sbnz\model\PraviloGubitakTezine.class
+com\ftn\sbnz\model\SaltRule.class
+com\ftn\sbnz\model\WeightLossRule.class
+com\ftn\sbnz\model\Batch.class
+com\ftn\sbnz\model\BatchStatus.class
+com\ftn\sbnz\model\ProductType.class
+com\ftn\sbnz\model\ProductionPhase.class
