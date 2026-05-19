@@ -1,4 +1,4 @@
-﻿package com.ftn.sbnz.rules;
+package com.ftn.sbnz.rules;
 
 import com.ftn.sbnz.model.Serija;
 import com.ftn.sbnz.model.StatusSerije;

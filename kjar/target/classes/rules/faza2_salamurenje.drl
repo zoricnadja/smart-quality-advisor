@@ -17,6 +17,7 @@ rule "F2-1 Sol ispod minimalne bezbedne vrednosti"
         $s : Serija(
             trenutnaFaza == FazaProizvodnje.SALAMURENJE,
             status != StatusSerije.BLOKIRANA,
+            eval($s.getProcenatSoli() > 0 || $s.getTemperaturaSalamure() > 0 || $s.getTrajanjeSalamurenjaH() > 0),
             procenatSoli < 1.8
         )
     then
@@ -30,12 +31,14 @@ rule "F2-2 Sol van opsega za tip proizvoda (Template)"
     when
         $s : Serija(
             trenutnaFaza == FazaProizvodnje.SALAMURENJE,
-            status != StatusSerije.BLOKIRANA
+            status != StatusSerije.BLOKIRANA,
+            eval($s.getProcenatSoli() > 0 || $s.getTemperaturaSalamure() > 0 || $s.getTrajanjeSalamurenjaH() > 0)
         )
         $p : PraviloSoli(
             tipProizvoda == $s.tipProizvoda,
             eval($s.getProcenatSoli() < minSol || $s.getProcenatSoli() > maxSol)
         )
+        eval(!$s.getAktivnaUpozorenja().toString().contains("F2-2:"))
     then
         $s.dodajUpozorenje("F2-2: SolVanOpsega - sol = " + $s.getProcenatSoli() +
             "% (opseg za " + $s.getTipProizvoda() + ": " + $p.getMinSol() + "–" + $p.getMaxSol() + "%)");
@@ -49,8 +52,10 @@ rule "F2-3 Temperatura salamure visoka"
         $s : Serija(
             trenutnaFaza == FazaProizvodnje.SALAMURENJE,
             status != StatusSerije.BLOKIRANA,
+            eval($s.getProcenatSoli() > 0 || $s.getTemperaturaSalamure() > 0 || $s.getTrajanjeSalamurenjaH() > 0),
             temperaturaSalamure > 8.0
         )
+        eval(!$s.getAktivnaUpozorenja().toString().contains("F2-3:"))
     then
         $s.dodajUpozorenje("F2-3: TempSalamureVisoka - temperatura = " + $s.getTemperaturaSalamure() + "°C (> 8°C, zona opasnosti!)");
         update($s);
@@ -63,8 +68,10 @@ rule "F2-4 Temperatura salamure niska"
         $s : Serija(
             trenutnaFaza == FazaProizvodnje.SALAMURENJE,
             status != StatusSerije.BLOKIRANA,
+            eval($s.getProcenatSoli() > 0 || $s.getTemperaturaSalamure() > 0 || $s.getTrajanjeSalamurenjaH() > 0),
             temperaturaSalamure < 2.0
         )
+        eval(!$s.getAktivnaUpozorenja().toString().contains("F2-4:"))
     then
         $s.dodajUpozorenje("F2-4: TempSalamureNiska - temperatura = " + $s.getTemperaturaSalamure() + "°C (< 2°C)");
         update($s);
@@ -78,7 +85,8 @@ rule "F2-5 CEP Temperatura salamure predugo visoka - blokada"
         $s : Serija(
             trenutnaFaza == FazaProizvodnje.SALAMURENJE,
             status != StatusSerije.BLOKIRANA,
-            eval($s.imaAktivnoUpozorenje("F2-3: TempSalamureVisoka - temperatura = " + $s.getTemperaturaSalamure() + "°C (> 8°C, zona opasnosti!)"))
+            eval($s.getProcenatSoli() > 0 || $s.getTemperaturaSalamure() > 0 || $s.getTrajanjeSalamurenjaH() > 0),
+            eval($s.getAktivnaUpozorenja().toString().contains("F2-3:"))
         )
     then
         $s.blokiraj("F2-5: SalamurenjeFailed - temperatura salamure predugo visoka (> 2h). Rizik od kvarenja.");
@@ -93,8 +101,10 @@ rule "F2-6 Trajanje salamurenja nepravilno"
         $s : Serija(
             trenutnaFaza == FazaProizvodnje.SALAMURENJE,
             status != StatusSerije.BLOKIRANA,
+            eval($s.getProcenatSoli() > 0 || $s.getTemperaturaSalamure() > 0 || $s.getTrajanjeSalamurenjaH() > 0),
             trajanjeSalamurenjaH < 24 || trajanjeSalamurenjaH > 96
         )
+        eval(!$s.getAktivnaUpozorenja().toString().contains("F2-6:"))
     then
         $s.dodajUpozorenje("F2-6: TrajanjeSalamurenjaNeispravno - trajanje = " + $s.getTrajanjeSalamurenjaH() + "h (opseg: 24–96h)");
         update($s);
@@ -107,6 +117,7 @@ rule "F2 Serija može napredovati u Fazu 3"
         $s : Serija(
             trenutnaFaza == FazaProizvodnje.SALAMURENJE,
             status != StatusSerije.BLOKIRANA,
+            eval($s.getProcenatSoli() > 0 || $s.getTemperaturaSalamure() > 0 || $s.getTrajanjeSalamurenjaH() > 0),
             procenatSoli >= 1.8,
             temperaturaSalamure >= 2.0,
             temperaturaSalamure <= 8.0,
