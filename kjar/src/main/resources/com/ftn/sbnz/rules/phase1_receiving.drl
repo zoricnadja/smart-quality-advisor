@@ -18,8 +18,9 @@ rule "F1-1 Receiving pH critical - immediate block"
             receivingPh > 6.5
         )
     then
-        $b.block("F1-1: Receiving pH is " + $b.getReceivingPh() + " (critical > 6.5). Batch rejected.");
-        update($b);
+        modify($b) {
+            block("F1-1: Receiving pH is " + $b.getReceivingPh() + " (critical > 6.5). Batch rejected.")
+        };
 end
 
 // F1-2 (Level 1): pH between 6.2 and 6.5 -> warning
@@ -34,8 +35,9 @@ rule "F1-2 Receiving pH high - warning"
         )
         eval(!$b.getActiveAlerts().toString().contains("F1-2:"))
     then
-        $b.addAlert("F1-2: ReceivingPhWarning - pH = " + $b.getReceivingPh() + " (range 6.2-6.5, confirmation required)");
-        update($b);
+        modify($b) {
+            addAlert("F1-2: ReceivingPhWarning - pH = " + $b.getReceivingPh() + " (range 6.2-6.5, confirmation required)")
+        };
 end
 
 // F1-3 (Level 1): Temperature > 7 C -> warning
@@ -49,8 +51,9 @@ rule "F1-3 Receiving temperature high"
         )
         eval(!$b.getActiveAlerts().toString().contains("F1-3:"))
     then
-        $b.addAlert("F1-3: ReceivingTemperatureHigh - temperature = " + $b.getReceivingTemperature() + " C (> 7 C)");
-        update($b);
+        modify($b) {
+            addAlert("F1-3: ReceivingTemperatureHigh - temperature = " + $b.getReceivingTemperature() + " C (> 7 C)")
+        };
 end
 
 // F1-4 (Level 1): Shelf life < 5 days -> warning
@@ -65,8 +68,9 @@ rule "F1-4 Raw material shelf life short"
         )
         eval(!$b.getActiveAlerts().toString().contains("F1-4:"))
     then
-        $b.addAlert("F1-4: RawMaterialShelfLifeShort - " + $b.getDaysUntilRawMaterialExpiry() + " days left until expiry");
-        update($b);
+        modify($b) {
+            addAlert("F1-4: RawMaterialShelfLifeShort - " + $b.getDaysUntilRawMaterialExpiry() + " days left until expiry")
+        };
 end
 
 // F1-5 (Level 2): High temperature and short shelf life -> block
@@ -80,8 +84,9 @@ rule "F1-5 Escalation - temperature and shelf life together"
             eval($b.getActiveAlerts().toString().contains("F1-4:"))
         )
     then
-        $b.block("F1-5: RawMaterialUnacceptable - high temperature and short shelf life at the same time.");
-        update($b);
+        modify($b) {
+            block("F1-5: RawMaterialUnacceptable - high temperature and short shelf life at the same time.")
+        };
 end
 
 // F1-6 (Level 2): Visual score < 3 -> block
@@ -94,8 +99,9 @@ rule "F1-6 Visual score unacceptable"
             receivingVisualScore < 3
         )
     then
-        $b.block("F1-6: RawMaterialUnacceptable - visual score = " + $b.getReceivingVisualScore() + " (< 3).");
-        update($b);
+        modify($b) {
+            block("F1-6: RawMaterialUnacceptable - visual score = " + $b.getReceivingVisualScore() + " (< 3).")
+        };
 end
 
 // Advance to Phase 2: pH <= 6.2, temp <= 7 C, score >= 3, no block
@@ -110,8 +116,9 @@ rule "F1 Batch can advance to Phase 2"
             receivingVisualScore >= 3
         )
     then
-        $b.getLog().add("[ADVANCE] Phase 1 completed successfully. Batch advances to Phase 2 - Curing.");
-        System.out.println("  >> ADVANCE [" + $b.getId() + "]: Phase 1 OK -> Phase 2");
-        $b.setCurrentPhase(ProductionPhase.CURING);
-        update($b);
+        modify($b) {
+            advanceTo(ProductionPhase.CURING,
+                "[ADVANCE] Phase 1 completed successfully. Batch advances to Phase 2 - Curing.",
+                "Phase 1 OK -> Phase 2")
+        };
 end

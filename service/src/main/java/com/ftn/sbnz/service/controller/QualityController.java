@@ -22,4 +22,22 @@ public class QualityController {
         qualityService.runDemo();
         return "Demonstration finished. Check the console for results.";
     }
+
+    /**
+     * GET /api/quality/cep-demo
+     * Runs CEP aggregation and chained trend scenarios.
+     */
+    @GetMapping("/cep-demo")
+    public String runCepDemo() {
+        return qualityService.runCepDemo();
+    }
+
+    /**
+     * GET /api/quality/backward-demo
+     * Runs a blocked fermentation scenario and returns the recursive backward chaining tree.
+     */
+    @GetMapping("/backward-demo")
+    public String runBackwardChainingDemo() {
+        return qualityService.runBackwardChainingDemo();
+    }
 }

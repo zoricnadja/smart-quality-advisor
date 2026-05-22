@@ -20,8 +20,9 @@ rule "F2-1 Salt below minimum safe value"
             saltPercentage < 1.8
         )
     then
-        $b.block("F2-1: Salt = " + $b.getSaltPercentage() + "% - below the 1.8% safety minimum. Batch blocked.");
-        update($b);
+        modify($b) {
+            block("F2-1: Salt = " + $b.getSaltPercentage() + "% - below the 1.8% safety minimum. Batch blocked.")
+        };
 end
 
 rule "F2-2 Salt outside range for product type (Template)"
@@ -39,9 +40,10 @@ rule "F2-2 Salt outside range for product type (Template)"
         )
         eval(!$b.getActiveAlerts().toString().contains("F2-2:"))
     then
-        $b.addAlert("F2-2: SaltOutOfRange - salt = " + $b.getSaltPercentage() +
-            "% (range for " + $b.getProductType() + ": " + $r.getMinSalt() + "-" + $r.getMaxSalt() + "%)");
-        update($b);
+        modify($b) {
+            addAlert("F2-2: SaltOutOfRange - salt = " + $b.getSaltPercentage() +
+            "% (range for " + $b.getProductType() + ": " + $r.getMinSalt() + "-" + $r.getMaxSalt() + "%)")
+        };
 end
 
 rule "F2-3 Brine temperature high"
@@ -56,8 +58,9 @@ rule "F2-3 Brine temperature high"
         )
         eval(!$b.getActiveAlerts().toString().contains("F2-3:"))
     then
-        $b.addAlert("F2-3: BrineTemperatureHigh - temperature = " + $b.getBrineTemperature() + " C (> 8 C, danger zone!)");
-        update($b);
+        modify($b) {
+            addAlert("F2-3: BrineTemperatureHigh - temperature = " + $b.getBrineTemperature() + " C (> 8 C, danger zone!)")
+        };
 end
 
 rule "F2-4 Brine temperature low"
@@ -72,8 +75,9 @@ rule "F2-4 Brine temperature low"
         )
         eval(!$b.getActiveAlerts().toString().contains("F2-4:"))
     then
-        $b.addAlert("F2-4: BrineTemperatureLow - temperature = " + $b.getBrineTemperature() + " C (< 2 C)");
-        update($b);
+        modify($b) {
+            addAlert("F2-4: BrineTemperatureLow - temperature = " + $b.getBrineTemperature() + " C (< 2 C)")
+        };
 end
 
 // F2-5 (Level 2/CEP): Active high-temperature warning -> block
@@ -87,8 +91,9 @@ rule "F2-5 CEP Brine temperature high too long - block"
             eval($b.getActiveAlerts().toString().contains("F2-3:"))
         )
     then
-        $b.block("F2-5: CuringFailed - brine temperature remained high too long (> 2h). Spoilage risk.");
-        update($b);
+        modify($b) {
+            block("F2-5: CuringFailed - brine temperature remained high too long (> 2h). Spoilage risk.")
+        };
 end
 
 // F2-6 (Level 1): Curing duration outside 24-96h
@@ -104,8 +109,9 @@ rule "F2-6 Curing duration invalid"
         )
         eval(!$b.getActiveAlerts().toString().contains("F2-6:"))
     then
-        $b.addAlert("F2-6: CuringDurationInvalid - duration = " + $b.getCuringDurationHours() + "h (range: 24-96h)");
-        update($b);
+        modify($b) {
+            addAlert("F2-6: CuringDurationInvalid - duration = " + $b.getCuringDurationHours() + "h (range: 24-96h)")
+        };
 end
 
 rule "F2 Batch can advance to Phase 3"
@@ -123,8 +129,9 @@ rule "F2 Batch can advance to Phase 3"
             activeAlerts.isEmpty() == true
         )
     then
-        $b.getLog().add("[ADVANCE] Phase 2 completed successfully. Batch advances to Phase 3 - Fermentation.");
-        System.out.println("  >> ADVANCE [" + $b.getId() + "]: Phase 2 OK -> Phase 3");
-        $b.setCurrentPhase(ProductionPhase.FERMENTATION);
-        update($b);
+        modify($b) {
+            advanceTo(ProductionPhase.FERMENTATION,
+                "[ADVANCE] Phase 2 completed successfully. Batch advances to Phase 3 - Fermentation.",
+                "Phase 2 OK -> Phase 3")
+        };
 end

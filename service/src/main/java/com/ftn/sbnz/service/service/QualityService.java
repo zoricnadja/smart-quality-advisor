@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 
 /**
@@ -17,6 +18,9 @@ public class QualityService {
 
     @Autowired
     private KieContainer kieContainer;
+
+    @Autowired
+    private BackwardChainingService backwardChainingService;
 
     /**
      * Runs the complete demonstration for all scenarios.
@@ -37,6 +41,168 @@ public class QualityService {
         System.out.println("\n" + "=".repeat(70));
         System.out.println("  Demonstration finished.");
         System.out.println("=".repeat(70));
+    }
+
+    public String runCepDemo() {
+        System.out.println("\n" + "=".repeat(70));
+        System.out.println("  SMART QUALITY ADVISOR - CEP Demonstration");
+        System.out.println("=".repeat(70));
+
+        StringBuilder report = new StringBuilder();
+        demoCepSmokeAggregation(report);
+        demoCepPhTrend(report);
+        demoCepDryerAggregation(report);
+
+        System.out.println("\n[CEP SUMMARY]");
+        System.out.println(report);
+        return report.toString();
+    }
+
+    private void demoCepSmokeAggregation(StringBuilder report) {
+        System.out.println("\n--- CEP C-1/C-2: Smoke temperature aggregation and chaining ---");
+
+        Batch batch = new Batch("CEP-SMOKE-001", ProductType.KULEN);
+        batch.setCurrentPhase(ProductionPhase.SMOKING);
+
+        LocalDateTime start = LocalDateTime.of(2026, 5, 22, 8, 0);
+        KieSession ks = kieContainer.newKieSession("ksession-rules");
+        ks.insert(batch);
+        insertSmokeWindow(ks, batch.getId(), start, 58.0, 57.0, 59.0);
+        insertSmokeWindow(ks, batch.getId(), start.plusMinutes(15), 56.0, 58.0, 57.0);
+        insertSmokeWindow(ks, batch.getId(), start.plusMinutes(30), 59.0, 58.0, 57.0);
+        ks.fireAllRules();
+        ks.dispose();
+
+        printResult(batch);
+        report.append("C-1/C-2 smoke CEP -> ")
+            .append(batch.getStatus())
+            .append(" | alerts: ")
+            .append(batch.getActiveAlerts())
+            .append(System.lineSeparator());
+    }
+
+    private void demoCepPhTrend(StringBuilder report) {
+        System.out.println("\n--- CEP C-3/C-4: pH trend detection and chaining ---");
+
+        Batch batch = new Batch("CEP-PH-001", ProductType.KULEN);
+        batch.setCurrentPhase(ProductionPhase.FERMENTATION);
+        batch.setFermentationPhByDay(Arrays.asList(6.2, 6.12, 6.05, 5.95, 5.8));
+        batch.setFermentationChamberTemperature(22.0);
+        batch.setFermentationChamberHumidity(90.0);
+
+        LocalDateTime start = LocalDateTime.of(2026, 5, 22, 8, 0);
+        KieSession ks = kieContainer.newKieSession("ksession-rules");
+        ks.insert(batch);
+        ks.insert(new PhMeasurementEvent(batch.getId(), 1, 6.20, start));
+        ks.insert(new PhMeasurementEvent(batch.getId(), 2, 6.12, start.plusDays(1)));
+        ks.insert(new PhMeasurementEvent(batch.getId(), 3, 6.05, start.plusDays(2)));
+        ks.fireAllRules();
+        ks.dispose();
+
+        printResult(batch);
+        report.append("C-3/C-4 pH CEP -> ")
+            .append(batch.getStatus())
+            .append(" | alerts: ")
+            .append(batch.getActiveAlerts())
+            .append(System.lineSeparator());
+    }
+
+    private void demoCepDryerAggregation(StringBuilder report) {
+        System.out.println("\n--- CEP C-5: Dryer 4h temperature aggregation ---");
+
+        Batch batch = new Batch("CEP-DRY-001", ProductType.KULEN);
+        batch.setCurrentPhase(ProductionPhase.DRYING_AGING);
+
+        LocalDateTime start = LocalDateTime.of(2026, 5, 22, 12, 0);
+        KieSession ks = kieContainer.newKieSession("ksession-rules");
+        ks.insert(batch);
+        ks.insert(new DryerTemperatureEvent(batch.getId(), 17.0, start));
+        ks.insert(new DryerTemperatureEvent(batch.getId(), 16.8, start.plusHours(1)));
+        ks.insert(new DryerTemperatureEvent(batch.getId(), 17.3, start.plusHours(2)));
+        ks.insert(new DryerTemperatureEvent(batch.getId(), 16.9, start.plusHours(3)));
+        ks.fireAllRules();
+        ks.dispose();
+
+        printResult(batch);
+        report.append("C-5 dryer CEP -> ")
+            .append(batch.getStatus())
+            .append(" | alerts: ")
+            .append(batch.getActiveAlerts())
+            .append(System.lineSeparator());
+    }
+
+    private void insertSmokeWindow(KieSession ks, String batchId, LocalDateTime windowStart, double... temperatures) {
+        for (int i = 0; i < temperatures.length; i++) {
+            ks.insert(new SmokeTemperatureEvent(batchId, temperatures[i], windowStart.plusMinutes(i * 5L)));
+        }
+    }
+
+    public String runBackwardChainingDemo() {
+        System.out.println("\n" + "=".repeat(70));
+        System.out.println("  SMART QUALITY ADVISOR - Recursive Backward Chaining Demos");
+        System.out.println("=".repeat(70));
+
+        SaltRule kulenSaltRule = new SaltRule(ProductType.KULEN, 2.5, 3.0);
+        WeightLossRule kulenWeightLossRule = new WeightLossRule(ProductType.KULEN, 30.0, 8);
+
+        StringBuilder report = new StringBuilder();
+
+        Batch phase1 = new Batch("SER-BC-001", ProductType.KULEN);
+        phase1.setReceivingPh(6.8);
+        phase1.setReceivingTemperature(4.0);
+        phase1.setReceivingVisualScore(4);
+        phase1.setRawMaterialShelfLife(LocalDate.now().plusDays(20));
+        appendBackwardScenario(report, "Phase 1 - Receiving pH critical", phase1, null, null);
+
+        Batch phase2 = new Batch("SER-BC-002", ProductType.KULEN);
+        phase2.setCurrentPhase(ProductionPhase.CURING);
+        phase2.setSaltPercentage(1.5);
+        phase2.setBrineTemperature(5.0);
+        phase2.setCuringDurationHours(48);
+        appendBackwardScenario(report, "Phase 2 - Salt below safe minimum", phase2, kulenSaltRule, null);
+
+        Batch phase3 = new Batch("SER-2025-042", ProductType.KULEN);
+        phase3.setCurrentPhase(ProductionPhase.FERMENTATION);
+        phase3.setFermentationPhByDay(Arrays.asList(6.2, 6.08, 5.99, 5.91, 5.84));
+        phase3.setFermentationChamberTemperature(27.0);
+        phase3.setFermentationChamberHumidity(90.0);
+        appendBackwardScenario(report, "Phase 3 - Fermentation pH and trend failure", phase3, null, null);
+
+        Batch phase4 = new Batch("SER-BC-004", ProductType.KULEN);
+        phase4.setCurrentPhase(ProductionPhase.SMOKING);
+        phase4.setSmokeTemperature(55.0);
+        phase4.setSmokingDurationHours(6);
+        appendBackwardScenario(report, "Phase 4 - Insufficient thermal treatment", phase4, null, null);
+
+        Batch phase5 = new Batch("SER-BC-005", ProductType.KULEN);
+        phase5.setCurrentPhase(ProductionPhase.DRYING_AGING);
+        phase5.setWeeklyWeightLossPercentages(Arrays.asList(3.0, 5.0, 8.0, 11.0, 13.0, 16.0, 19.0, 22.0));
+        phase5.setDryingRoomTemperature(14.0);
+        phase5.setDryingRoomHumidity(80.0);
+        appendBackwardScenario(report, "Phase 5 - Weight loss below product minimum", phase5, null, kulenWeightLossRule);
+
+        Batch phase6 = new Batch("SER-BC-006", ProductType.KULEN);
+        phase6.setCurrentPhase(ProductionPhase.FINAL_INSPECTION);
+        phase6.setFinalPh(5.5);
+        phase6.setWaterActivity(0.88);
+        phase6.setFinalVisualScore(4);
+        appendBackwardScenario(report, "Phase 6 - Final pH unacceptable", phase6, null, null);
+
+        System.out.println("\n[BACKWARD CHAINING EXPLANATION]");
+        System.out.println(report);
+        return report.toString();
+    }
+
+    private void appendBackwardScenario(StringBuilder report, String title, Batch batch, SaltRule saltRule, WeightLossRule weightLossRule) {
+        System.out.println("\n--- BACKWARD SCENARIO: " + title + " ---");
+        runRules(batch, saltRule, weightLossRule);
+
+        report.append("=== ")
+            .append(title)
+            .append(" ===")
+            .append(System.lineSeparator())
+            .append(backwardChainingService.explainWhyBlockedText(batch, saltRule, weightLossRule))
+            .append(System.lineSeparator());
     }
 
     private void demoPhase1() {
@@ -94,18 +260,29 @@ public class QualityService {
         runRules(b2b, kulenSaltRule, null);
         printResult(b2b);
 
-        System.out.println("\n[2c] Salt = 2.0%, all OK for sausage -> advance to Phase 3");
+        System.out.println("\n[2c] Salt = 2.5% - outside sausage range (1.8-2.2%) -> template warning");
         Batch b2c = new Batch("BATCH-012", ProductType.SAUSAGE);
         b2c.setCurrentPhase(ProductionPhase.CURING);
-        b2c.setSaltPercentage(2.0);
+        b2c.setSaltPercentage(2.5);
         b2c.setBrineTemperature(5.0);
         b2c.setCuringDurationHours(48);
         runRules(b2c, sausageSaltRule, null);
         printResult(b2c);
+
+        System.out.println("\n[2d] Salt = 2.0%, all OK for sausage -> advance to Phase 3");
+        Batch b2d = new Batch("BATCH-013", ProductType.SAUSAGE);
+        b2d.setCurrentPhase(ProductionPhase.CURING);
+        b2d.setSaltPercentage(2.0);
+        b2d.setBrineTemperature(5.0);
+        b2d.setCuringDurationHours(48);
+        runRules(b2d, sausageSaltRule, null);
+        printResult(b2d);
     }
 
     private void demoPhase3() {
-        System.out.println("\n--- SCENARIO 3: Phase 3 - Fermentation (pH trend CEP) ---");
+        System.out.println("\n--- SCENARIO 3: Phase 3 - Fermentation (pH trend CEP + template) ---");
+
+        PhFermentationRule kulenPhRule = new PhFermentationRule(ProductType.KULEN, 5.0);
 
         System.out.println("\n[3a] Day 5 pH = 5.7 > 5.3 -> block");
         Batch b3a = new Batch("BATCH-020", ProductType.KULEN);
@@ -125,14 +302,23 @@ public class QualityService {
         runRules(b3b, null, null);
         printResult(b3b);
 
-        System.out.println("\n[3c] Day 5 pH = 5.1, trend OK -> advance to Phase 4");
+        System.out.println("\n[3c] Template threshold: kulen day 5 pH = 5.1 > custom 5.0 -> block");
         Batch b3c = new Batch("BATCH-022", ProductType.KULEN);
         b3c.setCurrentPhase(ProductionPhase.FERMENTATION);
-        b3c.setFermentationPhByDay(Arrays.asList(6.2, 5.9, 5.6, 5.4, 5.1));
+        b3c.setFermentationPhByDay(Arrays.asList(6.2, 5.9, 5.6, 5.3, 5.1));
         b3c.setFermentationChamberTemperature(21.0);
         b3c.setFermentationChamberHumidity(90.0);
-        runRules(b3c, null, null);
+        runRules(b3c, null, null, kulenPhRule);
         printResult(b3c);
+
+        System.out.println("\n[3d] Day 5 pH = 5.1, no template, trend OK -> advance to Phase 4");
+        Batch b3d = new Batch("BATCH-023", ProductType.KULEN);
+        b3d.setCurrentPhase(ProductionPhase.FERMENTATION);
+        b3d.setFermentationPhByDay(Arrays.asList(6.2, 5.9, 5.6, 5.4, 5.1));
+        b3d.setFermentationChamberTemperature(21.0);
+        b3d.setFermentationChamberHumidity(90.0);
+        runRules(b3d, null, null);
+        printResult(b3d);
     }
 
     private void demoPhase4() {
@@ -167,6 +353,7 @@ public class QualityService {
         System.out.println("\n--- SCENARIO 5: Phase 5 - Drying/Aging (weight-loss template) ---");
 
         WeightLossRule kulenWeightLossRule = new WeightLossRule(ProductType.KULEN, 30.0, 8);
+        WeightLossRule sausageWeightLossRule = new WeightLossRule(ProductType.SAUSAGE, 25.0, 6);
 
         System.out.println("\n[5a] Weight loss = 22% < 30% for kulen -> progress blocked (template)");
         Batch b5a = new Batch("BATCH-040", ProductType.KULEN);
@@ -185,6 +372,15 @@ public class QualityService {
         b5b.setDryingRoomHumidity(80.0);
         runRules(b5b, null, kulenWeightLossRule);
         printResult(b5b);
+
+        System.out.println("\n[5c] Weight loss = 20% < 25% after 6 weeks for sausage -> progress blocked (template)");
+        Batch b5c = new Batch("BATCH-042", ProductType.SAUSAGE);
+        b5c.setCurrentPhase(ProductionPhase.DRYING_AGING);
+        b5c.setWeeklyWeightLossPercentages(Arrays.asList(4.0, 7.0, 10.0, 13.0, 17.0, 20.0));
+        b5c.setDryingRoomTemperature(14.0);
+        b5c.setDryingRoomHumidity(80.0);
+        runRules(b5c, null, sausageWeightLossRule);
+        printResult(b5c);
     }
 
     private void demoPhase6() {
@@ -282,10 +478,15 @@ public class QualityService {
     }
 
     private void runRules(Batch batch, SaltRule saltRule, WeightLossRule weightLossRule) {
+        runRules(batch, saltRule, weightLossRule, null);
+    }
+
+    private void runRules(Batch batch, SaltRule saltRule, WeightLossRule weightLossRule, PhFermentationRule phFermentationRule) {
         KieSession ks = kieContainer.newKieSession("ksession-rules");
         ks.insert(batch);
         if (saltRule != null) ks.insert(saltRule);
         if (weightLossRule != null) ks.insert(weightLossRule);
+        if (phFermentationRule != null) ks.insert(phFermentationRule);
         ks.fireAllRules();
         ks.dispose();
     }

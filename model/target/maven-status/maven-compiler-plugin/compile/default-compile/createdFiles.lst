@@ -1,6 +1,15 @@
-com\ftn\sbnz\model\SaltRule.class
 com\ftn\sbnz\model\WeightLossRule.class
 com\ftn\sbnz\model\Batch.class
-com\ftn\sbnz\model\BatchStatus.class
+com\ftn\sbnz\model\DryerTemperatureEvent.class
 com\ftn\sbnz\model\ProductType.class
+com\ftn\sbnz\model\FermentationAtRiskEvent.class
+com\ftn\sbnz\model\SmokeTemperatureEvent.class
+com\ftn\sbnz\model\Aggregated15minSmoke.class
 com\ftn\sbnz\model\ProductionPhase.class
+com\ftn\sbnz\model\SlowPhTrendEvent.class
+com\ftn\sbnz\model\Aggregated45minSmoke.class
+com\ftn\sbnz\model\SaltRule.class
+com\ftn\sbnz\model\BatchStatus.class
+com\ftn\sbnz\model\PhMeasurementEvent.class
+com\ftn\sbnz\model\Aggregated4hDryer.class
+com\ftn\sbnz\model\PhFermentationRule.class

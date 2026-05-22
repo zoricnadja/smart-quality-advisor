@@ -19,8 +19,9 @@ rule "F6-1 Final product pH unacceptable"
             finalPh > 5.3
         )
     then
-        $b.block("F6-1: FinalPhUnacceptable - final pH = " + $b.getFinalPh() + " (> 5.3). Batch blocked.");
-        update($b);
+        modify($b) {
+            block("F6-1: FinalPhUnacceptable - final pH = " + $b.getFinalPh() + " (> 5.3). Batch blocked.")
+        };
 end
 
 // F6-2 (Level 1): aw > 0.92 -> block
@@ -34,8 +35,9 @@ rule "F6-2 Water activity unacceptable"
             waterActivity > 0.92
         )
     then
-        $b.block("F6-2: WaterActivityUnacceptable - aw = " + $b.getWaterActivity() + " (> 0.92, not shelf-stable without refrigeration). Batch blocked.");
-        update($b);
+        modify($b) {
+            block("F6-2: WaterActivityUnacceptable - aw = " + $b.getWaterActivity() + " (> 0.92, not shelf-stable without refrigeration). Batch blocked.")
+        };
 end
 
 // F6-3 (Level 1): Visual score < 4 -> warning
@@ -50,8 +52,9 @@ rule "F6-3 Final visual score unacceptable"
         )
         eval(!$b.getActiveAlerts().toString().contains("F6-3:"))
     then
-        $b.addAlert("F6-3: FinalVisualScorePoor - final visual score = " + $b.getFinalVisualScore() + " (< 4)");
-        update($b);
+        modify($b) {
+            addAlert("F6-3: FinalVisualScorePoor - final visual score = " + $b.getFinalVisualScore() + " (< 4)")
+        };
 end
 
 // F6-4 (Level 2): Poor visual score and unacceptable chemistry -> block
@@ -66,8 +69,9 @@ rule "F6-4 Final escalation block - visual score and chemistry"
             eval($b.getFinalPh() > 5.3 || $b.getWaterActivity() > 0.92)
         )
     then
-        $b.block("F6-4: BatchFinallyBlocked - poor visual score and unacceptable chemical parameters.");
-        update($b);
+        modify($b) {
+            block("F6-4: BatchFinallyBlocked - poor visual score and unacceptable chemical parameters.")
+        };
 end
 
 // F6-5 (Level 3): All values OK -> batch approved
@@ -83,6 +87,7 @@ rule "F6-5 Batch approved - passed final inspection"
             finalVisualScore >= 4
         )
     then
-        $b.approve();
-        update($b);
+        modify($b) {
+            approve()
+        };
 end

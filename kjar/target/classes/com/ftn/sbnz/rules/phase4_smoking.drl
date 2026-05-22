@@ -20,8 +20,9 @@ rule "F4-1 Smoke temperature too high"
         )
         eval(!$b.getActiveAlerts().toString().contains("F4-1:"))
     then
-        $b.addAlert("F4-1: SmokeTemperatureTooHigh - temperature = " + $b.getSmokeTemperature() + " C (> 90 C, case hardening risk)");
-        update($b);
+        modify($b) {
+            addAlert("F4-1: SmokeTemperatureTooHigh - temperature = " + $b.getSmokeTemperature() + " C (> 90 C, case hardening risk)")
+        };
 end
 
 // F4-2 (Level 1): Smoke temperature < 55 C -> insufficient heat treatment warning
@@ -36,8 +37,9 @@ rule "F4-2 Smoke temperature too low"
         )
         eval(!$b.getActiveAlerts().toString().contains("F4-2:"))
     then
-        $b.addAlert("F4-2: SmokeTemperatureTooLow - temperature = " + $b.getSmokeTemperature() + " C (< 55 C, insufficient heat treatment risk)");
-        update($b);
+        modify($b) {
+            addAlert("F4-2: SmokeTemperatureTooLow - temperature = " + $b.getSmokeTemperature() + " C (< 55 C, insufficient heat treatment risk)")
+        };
 end
 
 // F4-3 (Level 2/CEP): Average smoke temperature < 60 C in a 15-minute window
@@ -52,8 +54,9 @@ rule "F4-3 CEP Insufficient heat treatment in 15-minute window"
         )
         eval(!$b.getActiveAlerts().toString().contains("F4-3:"))
     then
-        $b.addAlert("F4-3: InsufficientHeatTreatment15min - average smoke temperature = " + $b.getSmokeTemperature() + " C (< 60 C in 15-minute window)");
-        update($b);
+        modify($b) {
+            addAlert("F4-3: InsufficientHeatTreatment15min - average smoke temperature = " + $b.getSmokeTemperature() + " C (< 60 C in 15-minute window)")
+        };
 end
 
 // F4-4 (Level 2/CEP chaining): Insufficient heat treatment for 45+ minutes
@@ -69,8 +72,9 @@ rule "F4-4 CEP Insufficient heat treatment for 45+ minutes - critical"
         )
         eval(!$b.getActiveAlerts().toString().contains("F4-4:"))
     then
-        $b.addAlert("F4-4: InsufficientHeatTreatment - smoke temperature < 60 C for 3+ consecutive 15-minute windows (total >= 45 min). CRITICAL!");
-        update($b);
+        modify($b) {
+            addAlert("F4-4: InsufficientHeatTreatment - smoke temperature < 60 C for 3+ consecutive 15-minute windows (total >= 45 min). CRITICAL!")
+        };
 end
 
 // F4-5 (Level 3): InsufficientHeatTreatment -> block
@@ -84,8 +88,9 @@ rule "F4-5 Smoking failed - block"
             eval($b.getActiveAlerts().toString().contains("F4-4:"))
         )
     then
-        $b.block("F4-5: SmokingFailed - insufficient heat treatment. Repeat smoking or discard the batch.");
-        update($b);
+        modify($b) {
+            block("F4-5: SmokingFailed - insufficient heat treatment. Repeat smoking or discard the batch.")
+        };
 end
 
 // F4-6 (Level 2): Total smoking duration > 10h -> warning
@@ -100,8 +105,9 @@ rule "F4-6 Smoking duration too long"
         )
         eval(!$b.getActiveAlerts().toString().contains("F4-6:"))
     then
-        $b.addAlert("F4-6: SmokingDurationTooLong - duration = " + $b.getSmokingDurationHours() + "h (> 10h, excessive processing)");
-        update($b);
+        modify($b) {
+            addAlert("F4-6: SmokingDurationTooLong - duration = " + $b.getSmokingDurationHours() + "h (> 10h, excessive processing)")
+        };
 end
 
 // F4-7 (Level 3): Temperature in range + duration 4-8h -> smoking successful
@@ -118,8 +124,9 @@ rule "F4-7 Smoking successful - advance to Phase 5"
             smokingDurationHours <= 8
         )
     then
-        $b.getLog().add("[ADVANCE] SmokingSuccessful. Batch advances to Phase 5 - Drying/Aging.");
-        System.out.println("  >> ADVANCE [" + $b.getId() + "]: Phase 4 OK -> Phase 5");
-        $b.setCurrentPhase(ProductionPhase.DRYING_AGING);
-        update($b);
+        modify($b) {
+            advanceTo(ProductionPhase.DRYING_AGING,
+                "[ADVANCE] SmokingSuccessful. Batch advances to Phase 5 - Drying/Aging.",
+                "Phase 4 OK -> Phase 5")
+        };
 end

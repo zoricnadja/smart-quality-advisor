@@ -21,9 +21,10 @@ rule "F5-1 Weight loss too slow after week 2"
         )
         eval(!$b.getActiveAlerts().toString().contains("F5-1:"))
     then
-        $b.addAlert("F5-1: WeightLossTooSlow - week 2 loss = " +
-            String.format("%.1f", $b.getWeightLossAfterWeek(2)) + "% (< 8%, poor drying conditions)");
-        update($b);
+        modify($b) {
+            addAlert("F5-1: WeightLossTooSlow - week 2 loss = " +
+            String.format("%.1f", $b.getWeightLossAfterWeek(2)) + "% (< 8%, poor drying conditions)")
+        };
 end
 
 // F5-2 (Level 1): Weight loss after week 2 > 20% (too fast)
@@ -38,9 +39,10 @@ rule "F5-2 Weight loss too fast after week 2"
         )
         eval(!$b.getActiveAlerts().toString().contains("F5-2:"))
     then
-        $b.addAlert("F5-2: WeightLossTooFast - week 2 loss = " +
-            String.format("%.1f", $b.getWeightLossAfterWeek(2)) + "% (> 20%, drying too fast - case cracking risk!)");
-        update($b);
+        modify($b) {
+            addAlert("F5-2: WeightLossTooFast - week 2 loss = " +
+            String.format("%.1f", $b.getWeightLossAfterWeek(2)) + "% (> 20%, drying too fast - case cracking risk!)")
+        };
 end
 
 // F5-3 (Level 1): Drying room temperature > 18 C
@@ -55,8 +57,9 @@ rule "F5-3 Drying room temperature too high"
         )
         eval(!$b.getActiveAlerts().toString().contains("F5-3:"))
     then
-        $b.addAlert("F5-3: DryingRoomTemperatureTooHigh - temperature = " + $b.getDryingRoomTemperature() + " C (> 18 C)");
-        update($b);
+        modify($b) {
+            addAlert("F5-3: DryingRoomTemperatureTooHigh - temperature = " + $b.getDryingRoomTemperature() + " C (> 18 C)")
+        };
 end
 
 // F5-4 (Level 1): Drying room humidity outside 70-90%
@@ -71,8 +74,9 @@ rule "F5-4 Drying room humidity outside range"
         )
         eval(!$b.getActiveAlerts().toString().contains("F5-4:"))
     then
-        $b.addAlert("F5-4: DryingRoomHumidityOutOfRange - humidity = " + $b.getDryingRoomHumidity() + "% (range: 70-90%)");
-        update($b);
+        modify($b) {
+            addAlert("F5-4: DryingRoomHumidityOutOfRange - humidity = " + $b.getDryingRoomHumidity() + "% (range: 70-90%)")
+        };
 end
 
 // F5-5 (Level 2/CEP): Drying room temperature > 16 C averaged over a 4h window -> escalation
@@ -88,8 +92,9 @@ rule "F5-5 CEP Persistent temperature risk during drying"
         )
         eval(!$b.getActiveAlerts().toString().contains("F5-5:"))
     then
-        $b.addAlert("F5-5: PersistentDryingTemperatureRisk - average temperature > 16 C in a 4h window. Escalation!");
-        update($b);
+        modify($b) {
+            addAlert("F5-5: PersistentDryingTemperatureRisk - average temperature > 16 C in a 4h window. Escalation!")
+        };
 end
 
 // F5-6 (Level 2): Slow weight loss and persistent temperature risk -> drying at risk
@@ -105,11 +110,12 @@ rule "F5-6 Drying at risk - combined risks"
         )
         eval(!$b.getActiveAlerts().toString().contains("F5-6:"))
     then
-        $b.addAlert("F5-6: DryingAtRisk - slow weight loss and temperature risk. Adjust temperature and humidity.");
-        update($b);
+        modify($b) {
+            addAlert("F5-6: DryingAtRisk - slow weight loss and temperature risk. Adjust temperature and humidity.")
+        };
 end
 
-// F5-7 (Template/Level 2): Total loss below product minimum -> aging not complete
+// F5-7 (Template/Level 2): Total loss below product minimum -> block progress
 rule "F5-7 Template Aging not complete - loss below minimum"
     salience 85
     when
@@ -123,12 +129,12 @@ rule "F5-7 Template Aging not complete - loss below minimum"
             eval($b.getWeeklyWeightLossPercentages().size() >= deadlineWeeks &&
                  $b.getTotalWeightLoss() < minWeightLossPercent)
         )
-        eval(!$b.getActiveAlerts().toString().contains("F5-7:"))
     then
-        $b.addAlert("F5-7: AgingNotComplete - total loss = " +
+        modify($b) {
+            block("F5-7: AgingNotComplete - total loss = " +
             String.format("%.1f", $b.getTotalWeightLoss()) +
-            "% (minimum for " + $b.getProductType() + ": " + $r.getMinWeightLossPercent() + "% after " + $r.getDeadlineWeeks() + " weeks). Progress blocked.");
-        update($b);
+            "% (minimum for " + $b.getProductType() + ": " + $r.getMinWeightLossPercent() + "% after " + $r.getDeadlineWeeks() + " weeks). Progress blocked.")
+        };
 end
 
 // F5-8 (Level 3): Total loss in range and no template block -> aging complete
@@ -147,8 +153,9 @@ rule "F5-8 Aging complete - advance to Phase 6"
                  $b.getTotalWeightLoss() < minWeightLossPercent)
         )
     then
-        $b.getLog().add("[ADVANCE] AgingComplete. Batch advances to Phase 6 - Final Inspection.");
-        System.out.println("  >> ADVANCE [" + $b.getId() + "]: Phase 5 OK -> Phase 6");
-        $b.setCurrentPhase(ProductionPhase.FINAL_INSPECTION);
-        update($b);
+        modify($b) {
+            advanceTo(ProductionPhase.FINAL_INSPECTION,
+                "[ADVANCE] AgingComplete. Batch advances to Phase 6 - Final Inspection.",
+                "Phase 5 OK -> Phase 6")
+        };
 end

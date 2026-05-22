@@ -87,6 +87,12 @@ public class Batch {
         System.out.println("  ** APPROVED [" + id + "]");
     }
 
+    public void advanceTo(ProductionPhase nextPhase, String logEntry, String consoleMessage) {
+        log.add(logEntry);
+        System.out.println("  >> ADVANCE [" + id + "]: " + consoleMessage);
+        this.currentPhase = nextPhase;
+    }
+
     public boolean hasActiveAlert(String alert) {
         return activeAlerts.contains(alert);
     }

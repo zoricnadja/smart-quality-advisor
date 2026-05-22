@@ -1,3 +1,7 @@
-com\ftn\sbnz\service\service\QualityService.class
+com\ftn\sbnz\service\service\BackwardChainingService$Query.class
 com\ftn\sbnz\service\controller\QualityController.class
 com\ftn\sbnz\service\ServiceApplication.class
+com\ftn\sbnz\service\service\BackwardChainingService.class
+com\ftn\sbnz\service\service\QualityService.class
+com\ftn\sbnz\service\service\BackwardChainingService$Context.class
+com\ftn\sbnz\service\dto\ExplanationNode.class
