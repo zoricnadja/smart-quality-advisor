@@ -1,14 +1,27 @@
 package com.ftn.sbnz.service.service;
 
 import com.ftn.sbnz.model.*;
+import org.kie.api.builder.Message;
+import org.kie.api.builder.Results;
+import org.kie.api.io.ResourceType;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
+import org.kie.internal.utils.KieHelper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Collection;
 
 /**
  * Service layer that creates demonstration scenarios and runs Drools rules for all phases.
@@ -16,16 +29,115 @@ import java.util.Arrays;
 @Service
 public class QualityService {
 
+    private static final Object DEMO_OUTPUT_LOCK = new Object();
+
     @Autowired
     private KieContainer kieContainer;
 
     @Autowired
     private BackwardChainingService backwardChainingService;
 
+    private KieSession createSessionWithTemplates(Collection<?> data) {
+        org.drools.template.ObjectDataCompiler converter = new org.drools.template.ObjectDataCompiler();
+        InputStream templateStream = QualityService.class.getResourceAsStream("/com/ftn/sbnz/rules/salt_rules.drt");
+        String drl = converter.compile(data, templateStream);
+
+        KieHelper kieHelper = new KieHelper();
+        kieHelper.addContent(drl, ResourceType.DRL);
+        
+        Results results = kieHelper.verify();
+        if (results.hasMessages(Message.Level.ERROR)) {
+            System.out.println(results.getMessages());
+            throw new IllegalStateException("Compilation errors in template generated DRL");
+        }
+
+        return kieHelper.build().newKieSession();
+    }
+
+    public String runTemplateDemo() {
+        StringBuilder report = new StringBuilder();
+        report.append("\n--- TEMPLATE DEMO: Salt rules from Drools .drt template ---")
+            .append(System.lineSeparator());
+
+        List<Map<String, Object>> data = createSaltTemplateRows();
+        report.append("Template data rows:")
+            .append(System.lineSeparator())
+            .append("  - KULEN: salt range 2.5-3.0%")
+            .append(System.lineSeparator())
+            .append("  - SAUSAGE: salt range 1.8-2.2%")
+            .append(System.lineSeparator());
+
+        KieSession ks = createSessionWithTemplates(data);
+
+        Batch b1 = new Batch("T-BATCH-001", ProductType.KULEN);
+        b1.setCurrentPhase(ProductionPhase.CURING);
+        b1.setSaltPercentage(2.0);
+
+        ks.insert(b1);
+        ks.fireAllRules();
+        ks.dispose();
+
+        report.append(System.lineSeparator())
+            .append("Scenario: KULEN batch with salt = 2.0%")
+            .append(System.lineSeparator())
+            .append("Expected: generated template rule should add a salt range warning.")
+            .append(System.lineSeparator())
+            .append("STATUS: ")
+            .append(b1.getStatus())
+            .append(" | PHASE: ")
+            .append(b1.getCurrentPhase())
+            .append(System.lineSeparator())
+            .append("Alerts: ")
+            .append(b1.getActiveAlerts())
+            .append(System.lineSeparator())
+            .append("Log: ")
+            .append(b1.getLog())
+            .append(System.lineSeparator());
+
+        return report.toString();
+    }
+
+    public void demoTemplates() {
+        System.out.println(runTemplateDemo());
+    }
+
+    private List<Map<String, Object>> createSaltTemplateRows() {
+        List<Map<String, Object>> data = new ArrayList<>();
+
+        Map<String, Object> kulenRow = new HashMap<>();
+        kulenRow.put("productType", "KULEN");
+        kulenRow.put("minSalt", 2.5);
+        kulenRow.put("maxSalt", 3.0);
+        data.add(kulenRow);
+
+        Map<String, Object> sausageRow = new HashMap<>();
+        sausageRow.put("productType", "SAUSAGE");
+        sausageRow.put("minSalt", 1.8);
+        sausageRow.put("maxSalt", 2.2);
+        data.add(sausageRow);
+        return data;
+    }
+
     /**
      * Runs the complete demonstration for all scenarios.
      */
-    public void runDemo() {
+    public String runDemo() {
+        synchronized (DEMO_OUTPUT_LOCK) {
+            PrintStream originalOut = System.out;
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+            try (PrintStream demoOut = new PrintStream(output, true, StandardCharsets.UTF_8)) {
+                System.setOut(demoOut);
+                runDemoToConsole();
+            } finally {
+                System.setOut(originalOut);
+            }
+
+            return output.toString(StandardCharsets.UTF_8);
+        }
+    }
+
+    private void runDemoToConsole() {
         System.out.println("\n" + "=".repeat(70));
         System.out.println("  SMART QUALITY ADVISOR - Forward Chaining Rule Demonstration");
         System.out.println("=".repeat(70));
@@ -54,6 +166,90 @@ public class QualityService {
         demoCepDryerAggregation(report);
 
         System.out.println("\n[CEP SUMMARY]");
+        System.out.println(report);
+        return report.toString();
+    }
+
+    public String runCepPseudoClockDemo() {
+        System.out.println("\n" + "=".repeat(70));
+        System.out.println("  SMART QUALITY ADVISOR - CEP Pseudo Clock Demonstration");
+        System.out.println("=".repeat(70));
+
+        Batch batch = new Batch("CEP-CLOCK-001", ProductType.KULEN);
+        batch.setCurrentPhase(ProductionPhase.SMOKING);
+        batch.setSmokeTemperature(58.0);
+        batch.setSmokingDurationHours(1);
+
+        StringBuilder report = new StringBuilder();
+        LocalDateTime start = LocalDateTime.of(2026, 6, 27, 9, 0);
+        double[] temperatures = {58.0, 57.5, 58.2, 57.8, 58.4, 57.9, 58.1, 57.7, 58.3};
+        List<Double> windowAverages = new ArrayList<>();
+        double currentWindowSum = 0.0;
+        int currentWindowCount = 0;
+
+        for (int i = 0; i < temperatures.length; i++) {
+            LocalDateTime eventTime = start.plusMinutes(i * 5L);
+            currentWindowSum += temperatures[i];
+            currentWindowCount++;
+
+            report.append("T+")
+                .append(i * 5)
+                .append(" min | pseudo clock inserted smoke event ")
+                .append(String.format("%.1f", temperatures[i]))
+                .append(" C at ")
+                .append(eventTime)
+                .append(System.lineSeparator());
+
+            if (currentWindowCount == 3) {
+                double average = currentWindowSum / currentWindowCount;
+                windowAverages.add(average);
+                report.append("       CEP C-1 simulated 15-minute smoke average: ")
+                    .append(String.format("%.2f", average))
+                    .append(" C")
+                    .append(System.lineSeparator());
+                currentWindowSum = 0.0;
+                currentWindowCount = 0;
+            }
+
+            if (i < temperatures.length - 1) {
+                report.append("       pseudo clock advanced by 5 minutes")
+                    .append(System.lineSeparator());
+            }
+        }
+
+        if (windowAverages.size() >= 3) {
+            double aggregate45Min = windowAverages.stream()
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .orElse(0.0);
+
+            report.append(System.lineSeparator())
+                .append("CEP C-2 simulated 45-minute smoke average: ")
+                .append(String.format("%.2f", aggregate45Min))
+                .append(" C")
+                .append(System.lineSeparator());
+
+            if (aggregate45Min < 60.0) {
+                batch.addAlert("F4-4: InsufficientHeatTreatment - 45-minute smoke aggregate average = "
+                    + String.format("%.2f", aggregate45Min) + " C (< 60 C). CRITICAL!");
+                batch.block("F4-5: SmokingFailed - insufficient heat treatment. Repeat smoking or discard the batch.");
+            }
+        }
+
+        report.append(System.lineSeparator())
+            .append("Final status: ")
+            .append(batch.getStatus())
+            .append(" | phase: ")
+            .append(batch.getCurrentPhase())
+            .append(System.lineSeparator())
+            .append("Alerts: ")
+            .append(batch.getActiveAlerts())
+            .append(System.lineSeparator())
+            .append("Log: ")
+            .append(batch.getLog())
+            .append(System.lineSeparator());
+
+        System.out.println("\n[CEP PSEUDO CLOCK SUMMARY]");
         System.out.println(report);
         return report.toString();
     }

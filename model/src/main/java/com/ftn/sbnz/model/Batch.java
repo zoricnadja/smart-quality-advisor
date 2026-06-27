@@ -94,7 +94,7 @@ public class Batch {
     }
 
     public boolean hasActiveAlert(String alert) {
-        return activeAlerts.contains(alert);
+        return activeAlerts.stream().anyMatch(existing -> existing.startsWith(alert));
     }
 
     public boolean isBlocked() {
@@ -109,9 +109,17 @@ public class Batch {
         return -1;
     }
 
+    public double phOnDay(Integer day) {
+        return getPhOnDay(day);
+    }
+
     public double getPhDeltaBetweenDays(int dayN) {
         if (dayN < 2 || dayN > fermentationPhByDay.size()) return 0;
         return fermentationPhByDay.get(dayN - 2) - fermentationPhByDay.get(dayN - 1);
+    }
+
+    public double phDeltaBetweenDays(Integer dayN) {
+        return getPhDeltaBetweenDays(dayN);
     }
 
     public double getTotalWeightLoss() {
@@ -125,6 +133,10 @@ public class Batch {
             return weeklyWeightLossPercentages.get(idx);
         }
         return -1;
+    }
+
+    public double weightLossAfterWeek(Integer week) {
+        return getWeightLossAfterWeek(week);
     }
 
     public long getDaysUntilRawMaterialExpiry() {

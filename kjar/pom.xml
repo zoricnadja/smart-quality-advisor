@@ -17,7 +17,7 @@
     </properties>
 
     <dependencies>
-        <!-- Drools zavisnosti -->
+        <!-- Drools dependencies -->
         <dependency>
             <groupId>org.kie</groupId>
             <artifactId>kie-ci</artifactId>
@@ -39,7 +39,7 @@
             <version>${drools.version}</version>
         </dependency>
 
-        <!-- Model projekat -->
+        <!-- Model project -->
         <dependency>
             <groupId>com.ftn.sbnz</groupId>
             <artifactId>model</artifactId>

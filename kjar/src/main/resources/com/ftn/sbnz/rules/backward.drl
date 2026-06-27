@@ -1,0 +1,298 @@
+package com.ftn.sbnz.rules;
+
+import com.ftn.sbnz.model.Batch;
+import com.ftn.sbnz.model.BatchStatus;
+import com.ftn.sbnz.model.ExplanationEdge;
+import com.ftn.sbnz.model.ProductionPhase;
+import com.ftn.sbnz.model.SaltRule;
+import com.ftn.sbnz.model.WeightLossRule;
+
+// ============================================================
+//  BACKWARD CHAINING EXPLANATION GRAPH
+// ============================================================
+//
+// The rules below materialize direct explanation edges for a blocked batch.
+// The recursive query at the bottom then proves that a leaf cause explains the
+// root question by walking parent -> child edges, exactly like the classic
+// isContainedIn backward-chaining example.
+
+rule "B-ROOT Receiving blocked explanation root"
+    salience 50
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.RECEIVING)
+        not ExplanationEdge(batchId == $id, parent == "whyBatchIsBlocked(batch)", child == "phase:RECEIVING")
+    then
+        insert(new ExplanationEdge($id, "whyBatchIsBlocked(batch)", "phase:RECEIVING",
+            "The batch is blocked during raw material receiving."));
+end
+
+rule "B-ROOT Curing blocked explanation root"
+    salience 50
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.CURING)
+        not ExplanationEdge(batchId == $id, parent == "whyBatchIsBlocked(batch)", child == "phase:CURING")
+    then
+        insert(new ExplanationEdge($id, "whyBatchIsBlocked(batch)", "phase:CURING",
+            "The batch is blocked during curing."));
+end
+
+rule "B-ROOT Fermentation blocked explanation root"
+    salience 50
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.FERMENTATION)
+        not ExplanationEdge(batchId == $id, parent == "whyBatchIsBlocked(batch)", child == "phase:FERMENTATION")
+    then
+        insert(new ExplanationEdge($id, "whyBatchIsBlocked(batch)", "phase:FERMENTATION",
+            "The batch is blocked during fermentation."));
+end
+
+rule "B-ROOT Smoking blocked explanation root"
+    salience 50
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.SMOKING)
+        not ExplanationEdge(batchId == $id, parent == "whyBatchIsBlocked(batch)", child == "phase:SMOKING")
+    then
+        insert(new ExplanationEdge($id, "whyBatchIsBlocked(batch)", "phase:SMOKING",
+            "The batch is blocked during smoking."));
+end
+
+rule "B-ROOT Drying blocked explanation root"
+    salience 50
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.DRYING_AGING)
+        not ExplanationEdge(batchId == $id, parent == "whyBatchIsBlocked(batch)", child == "phase:DRYING_AGING")
+    then
+        insert(new ExplanationEdge($id, "whyBatchIsBlocked(batch)", "phase:DRYING_AGING",
+            "The batch is blocked during drying and aging."));
+end
+
+rule "B-ROOT Final inspection blocked explanation root"
+    salience 50
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.FINAL_INSPECTION)
+        not ExplanationEdge(batchId == $id, parent == "whyBatchIsBlocked(batch)", child == "phase:FINAL_INSPECTION")
+    then
+        insert(new ExplanationEdge($id, "whyBatchIsBlocked(batch)", "phase:FINAL_INSPECTION",
+            "The batch is blocked during final inspection."));
+end
+
+rule "B-F1 Receiving pH explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.RECEIVING, receivingPh > 6.5)
+        not ExplanationEdge(batchId == $id, parent == "phase:RECEIVING", child == "cause:receivingPh")
+    then
+        insert(new ExplanationEdge($id, "phase:RECEIVING", "cause:receivingPh",
+            "receiving pH = " + $b.getReceivingPh() + " (threshold: <= 6.5)"));
+end
+
+rule "B-F1 Visual score explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.RECEIVING, receivingVisualScore < 3)
+        not ExplanationEdge(batchId == $id, parent == "phase:RECEIVING", child == "cause:receivingVisualScore")
+    then
+        insert(new ExplanationEdge($id, "phase:RECEIVING", "cause:receivingVisualScore",
+            "visual score = " + $b.getReceivingVisualScore() + " (threshold: >= 3)"));
+end
+
+rule "B-F1 Temperature and expiry explain block"
+    salience 40
+    no-loop
+    when
+        $b : Batch(
+            $id : id,
+            status == BatchStatus.BLOCKED,
+            currentPhase == ProductionPhase.RECEIVING,
+            receivingTemperature > 7.0,
+            daysUntilRawMaterialExpiry < 5
+        )
+        not ExplanationEdge(batchId == $id, parent == "phase:RECEIVING", child == "cause:receivingTemperatureExpiry")
+    then
+        insert(new ExplanationEdge($id, "phase:RECEIVING", "cause:receivingTemperatureExpiry",
+            "temperature = " + $b.getReceivingTemperature() + " C, days until expiry = "
+            + $b.getDaysUntilRawMaterialExpiry() + " (blocked by the combination of > 7 C and < 5 days)"));
+end
+
+rule "B-F2 Salt safe minimum explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.CURING, saltPercentage < 1.8)
+        not ExplanationEdge(batchId == $id, parent == "phase:CURING", child == "cause:saltSafetyMinimum")
+    then
+        insert(new ExplanationEdge($id, "phase:CURING", "cause:saltSafetyMinimum",
+            "salt = " + $b.getSaltPercentage() + "% (safety minimum: 1.8%)"));
+end
+
+rule "B-F2 Brine temperature explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.CURING, brineTemperature > 8.0)
+        not ExplanationEdge(batchId == $id, parent == "phase:CURING", child == "cause:brineTemperature")
+    then
+        insert(new ExplanationEdge($id, "phase:CURING", "cause:brineTemperature",
+            "brine temperature = " + $b.getBrineTemperature() + " C (threshold: <= 8 C)"));
+end
+
+rule "B-F2 Curing duration explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch(
+            $id : id,
+            status == BatchStatus.BLOCKED,
+            currentPhase == ProductionPhase.CURING,
+            curingDurationHours < 24 || curingDurationHours > 96
+        )
+        not ExplanationEdge(batchId == $id, parent == "phase:CURING", child == "cause:curingDuration")
+    then
+        insert(new ExplanationEdge($id, "phase:CURING", "cause:curingDuration",
+            "curing duration = " + $b.getCuringDurationHours() + "h (range: 24-96h)"));
+end
+
+rule "B-F2 Product salt rule explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.CURING)
+        $r : SaltRule(
+            productType == $b.productType,
+            $b.saltPercentage < minSalt || $b.saltPercentage > maxSalt
+        )
+        not ExplanationEdge(batchId == $id, parent == "phase:CURING", child == "cause:productSaltRange")
+    then
+        insert(new ExplanationEdge($id, "phase:CURING", "cause:productSaltRange",
+            "salt = " + $b.getSaltPercentage() + "%, range for " + $b.getProductType()
+            + ": " + $r.getMinSalt() + "-" + $r.getMaxSalt() + "%"));
+end
+
+rule "B-F3 Day 5 pH explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.FERMENTATION, phOnDay(5) > 5.3)
+        not ExplanationEdge(batchId == $id, parent == "phase:FERMENTATION", child == "cause:fermentationDay5Ph")
+    then
+        insert(new ExplanationEdge($id, "phase:FERMENTATION", "cause:fermentationDay5Ph",
+            "pH on day 5 = " + $b.getPhOnDay(5) + " (threshold: <= 5.3)"));
+end
+
+rule "B-F3 Slow trend explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.FERMENTATION, hasActiveAlert("F3-6:"))
+        not ExplanationEdge(batchId == $id, parent == "phase:FERMENTATION", child == "cause:fermentationTrend")
+    then
+        insert(new ExplanationEdge($id, "phase:FERMENTATION", "cause:fermentationTrend",
+            "The pH trend or chained CEP trend events activated a fermentation block."));
+end
+
+rule "B-F3 Chamber temperature explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.FERMENTATION, fermentationChamberTemperature > 26.0)
+        not ExplanationEdge(batchId == $id, parent == "phase:FERMENTATION", child == "cause:fermentationTemperature")
+    then
+        insert(new ExplanationEdge($id, "phase:FERMENTATION", "cause:fermentationTemperature",
+            "chamber temperature = " + $b.getFermentationChamberTemperature() + " C (threshold: <= 26 C)"));
+end
+
+rule "B-F4 Smoke temperature explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch(
+            $id : id,
+            status == BatchStatus.BLOCKED,
+            currentPhase == ProductionPhase.SMOKING,
+            smokeTemperature < 60.0,
+            smokeTemperature > 0
+        )
+        not ExplanationEdge(batchId == $id, parent == "phase:SMOKING", child == "cause:smokeTemperature")
+    then
+        insert(new ExplanationEdge($id, "phase:SMOKING", "cause:smokeTemperature",
+            "average smoke temperature = " + $b.getSmokeTemperature()
+            + " C across CEP windows (threshold: >= 60 C)"));
+end
+
+rule "B-F5 Weight loss rule explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.DRYING_AGING)
+        $r : WeightLossRule(
+            productType == $b.productType,
+            $b.weeklyWeightLossPercentages.size() >= deadlineWeeks,
+            $b.getTotalWeightLoss() < minWeightLossPercent
+        )
+        not ExplanationEdge(batchId == $id, parent == "phase:DRYING_AGING", child == "cause:weightLossRule")
+    then
+        insert(new ExplanationEdge($id, "phase:DRYING_AGING", "cause:weightLossRule",
+            "total weight loss = " + $b.getTotalWeightLoss() + "% (minimum: "
+            + $r.getMinWeightLossPercent() + "% after " + $r.getDeadlineWeeks() + " weeks)"));
+end
+
+rule "B-F5 Default weight loss explains block"
+    salience 35
+    no-loop
+    when
+        $b : Batch(
+            $id : id,
+            status == BatchStatus.BLOCKED,
+            currentPhase == ProductionPhase.DRYING_AGING,
+            totalWeightLoss < 25.0
+        )
+        not WeightLossRule(productType == $b.productType)
+        not ExplanationEdge(batchId == $id, parent == "phase:DRYING_AGING", child == "cause:defaultWeightLoss")
+    then
+        insert(new ExplanationEdge($id, "phase:DRYING_AGING", "cause:defaultWeightLoss",
+            "total weight loss = " + $b.getTotalWeightLoss() + "% (default minimum: 25.0%)"));
+end
+
+rule "B-F6 Final pH explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.FINAL_INSPECTION, finalPh > 5.3)
+        not ExplanationEdge(batchId == $id, parent == "phase:FINAL_INSPECTION", child == "cause:finalPh")
+    then
+        insert(new ExplanationEdge($id, "phase:FINAL_INSPECTION", "cause:finalPh",
+            "final product pH = " + $b.getFinalPh() + " (threshold: <= 5.3)"));
+end
+
+rule "B-F6 Water activity explains block"
+    salience 40
+    no-loop
+    when
+        $b : Batch($id : id, status == BatchStatus.BLOCKED, currentPhase == ProductionPhase.FINAL_INSPECTION, waterActivity > 0.92)
+        not ExplanationEdge(batchId == $id, parent == "phase:FINAL_INSPECTION", child == "cause:waterActivity")
+    then
+        insert(new ExplanationEdge($id, "phase:FINAL_INSPECTION", "cause:waterActivity",
+            "water activity = " + $b.getWaterActivity() + " (threshold: <= 0.92)"));
+end
+
+query directExplanationEdge(String $batchId, String $parent, String $child, String $text)
+    ExplanationEdge(batchId == $batchId, parent == $parent, child == $child, text == $text)
+end
+
+query isExplainedBy(String $batchId, String $ancestor, String $descendant, String $text)
+    directExplanationEdge($batchId, $ancestor, $descendant, $text;)
+    or
+    (
+        directExplanationEdge($batchId, $ancestor, $middle, $middleText;)
+        and
+        isExplainedBy($batchId, $middle, $descendant, $text;)
+    )
+end

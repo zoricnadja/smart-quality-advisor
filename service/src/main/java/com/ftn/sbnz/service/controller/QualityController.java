@@ -2,6 +2,7 @@ package com.ftn.sbnz.service.controller;
 
 import com.ftn.sbnz.service.service.QualityService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,10 +18,9 @@ public class QualityController {
      * GET /api/quality/demo
      * Runs the full demonstration for all scenarios.
      */
-    @GetMapping("/demo")
+    @GetMapping(value = "/demo", produces = MediaType.TEXT_PLAIN_VALUE)
     public String runDemo() {
-        qualityService.runDemo();
-        return "Demonstration finished. Check the console for results.";
+        return qualityService.runDemo();
     }
 
     /**
@@ -30,6 +30,24 @@ public class QualityController {
     @GetMapping("/cep-demo")
     public String runCepDemo() {
         return qualityService.runCepDemo();
+    }
+
+    /**
+     * GET /api/quality/cep-pseudo-clock-demo
+     * Runs the CEP smoke-temperature scenario with a pseudo clock.
+     */
+    @GetMapping("/cep-pseudo-clock-demo")
+    public String runCepPseudoClockDemo() {
+        return qualityService.runCepPseudoClockDemo();
+    }
+
+    /**
+     * GET /api/quality/template-demo
+     * Runs the Drools template demonstration.
+     */
+    @GetMapping(value = "/template-demo", produces = MediaType.TEXT_PLAIN_VALUE)
+    public String runTemplateDemo() {
+        return qualityService.runTemplateDemo();
     }
 
     /**

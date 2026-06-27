@@ -16,10 +16,11 @@ rule "F5-1 Weight loss too slow after week 2"
         $b : Batch(
             currentPhase == ProductionPhase.DRYING_AGING,
             status != BatchStatus.BLOCKED,
-            eval(!$b.getWeeklyWeightLossPercentages().isEmpty() || $b.getDryingRoomTemperature() > 0 || $b.getDryingRoomHumidity() > 0),
-            eval($b.getWeightLossAfterWeek(2) >= 0 && $b.getWeightLossAfterWeek(2) < 8.0)
+            !weeklyWeightLossPercentages.isEmpty() || dryingRoomTemperature > 0 || dryingRoomHumidity > 0,
+            weightLossAfterWeek(2) >= 0,
+            weightLossAfterWeek(2) < 8.0,
+            !hasActiveAlert("F5-1:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F5-1:"))
     then
         modify($b) {
             addAlert("F5-1: WeightLossTooSlow - week 2 loss = " +
@@ -34,10 +35,10 @@ rule "F5-2 Weight loss too fast after week 2"
         $b : Batch(
             currentPhase == ProductionPhase.DRYING_AGING,
             status != BatchStatus.BLOCKED,
-            eval(!$b.getWeeklyWeightLossPercentages().isEmpty() || $b.getDryingRoomTemperature() > 0 || $b.getDryingRoomHumidity() > 0),
-            eval($b.getWeightLossAfterWeek(2) > 20.0)
+            !weeklyWeightLossPercentages.isEmpty() || dryingRoomTemperature > 0 || dryingRoomHumidity > 0,
+            weightLossAfterWeek(2) > 20.0,
+            !hasActiveAlert("F5-2:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F5-2:"))
     then
         modify($b) {
             addAlert("F5-2: WeightLossTooFast - week 2 loss = " +
@@ -52,10 +53,10 @@ rule "F5-3 Drying room temperature too high"
         $b : Batch(
             currentPhase == ProductionPhase.DRYING_AGING,
             status != BatchStatus.BLOCKED,
-            eval(!$b.getWeeklyWeightLossPercentages().isEmpty() || $b.getDryingRoomTemperature() > 0 || $b.getDryingRoomHumidity() > 0),
-            dryingRoomTemperature > 18.0
+            !weeklyWeightLossPercentages.isEmpty() || dryingRoomTemperature > 0 || dryingRoomHumidity > 0,
+            dryingRoomTemperature > 18.0,
+            !hasActiveAlert("F5-3:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F5-3:"))
     then
         modify($b) {
             addAlert("F5-3: DryingRoomTemperatureTooHigh - temperature = " + $b.getDryingRoomTemperature() + " C (> 18 C)")
@@ -69,10 +70,10 @@ rule "F5-4 Drying room humidity outside range"
         $b : Batch(
             currentPhase == ProductionPhase.DRYING_AGING,
             status != BatchStatus.BLOCKED,
-            eval(!$b.getWeeklyWeightLossPercentages().isEmpty() || $b.getDryingRoomTemperature() > 0 || $b.getDryingRoomHumidity() > 0),
-            eval($b.getDryingRoomHumidity() < 70.0 || $b.getDryingRoomHumidity() > 90.0)
+            !weeklyWeightLossPercentages.isEmpty() || dryingRoomTemperature > 0 || dryingRoomHumidity > 0,
+            dryingRoomHumidity < 70.0 || dryingRoomHumidity > 90.0,
+            !hasActiveAlert("F5-4:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F5-4:"))
     then
         modify($b) {
             addAlert("F5-4: DryingRoomHumidityOutOfRange - humidity = " + $b.getDryingRoomHumidity() + "% (range: 70-90%)")
@@ -86,11 +87,11 @@ rule "F5-5 CEP Persistent temperature risk during drying"
         $b : Batch(
             currentPhase == ProductionPhase.DRYING_AGING,
             status != BatchStatus.BLOCKED,
-            eval(!$b.getWeeklyWeightLossPercentages().isEmpty() || $b.getDryingRoomTemperature() > 0 || $b.getDryingRoomHumidity() > 0),
+            !weeklyWeightLossPercentages.isEmpty() || dryingRoomTemperature > 0 || dryingRoomHumidity > 0,
             dryingRoomTemperature > 16.0,
-            eval($b.getActiveAlerts().toString().contains("F5-3:"))
+            hasActiveAlert("F5-3:"),
+            !hasActiveAlert("F5-5:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F5-5:"))
     then
         modify($b) {
             addAlert("F5-5: PersistentDryingTemperatureRisk - average temperature > 16 C in a 4h window. Escalation!")
@@ -104,11 +105,12 @@ rule "F5-6 Drying at risk - combined risks"
         $b : Batch(
             currentPhase == ProductionPhase.DRYING_AGING,
             status != BatchStatus.BLOCKED,
-            eval(!$b.getWeeklyWeightLossPercentages().isEmpty() || $b.getDryingRoomTemperature() > 0 || $b.getDryingRoomHumidity() > 0),
-            eval($b.getActiveAlerts().toString().contains("F5-5:") &&
-                 ($b.getWeightLossAfterWeek(2) >= 0 && $b.getWeightLossAfterWeek(2) < 8.0))
+            !weeklyWeightLossPercentages.isEmpty() || dryingRoomTemperature > 0 || dryingRoomHumidity > 0,
+            hasActiveAlert("F5-5:"),
+            weightLossAfterWeek(2) >= 0,
+            weightLossAfterWeek(2) < 8.0,
+            !hasActiveAlert("F5-6:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F5-6:"))
     then
         modify($b) {
             addAlert("F5-6: DryingAtRisk - slow weight loss and temperature risk. Adjust temperature and humidity.")
@@ -122,12 +124,12 @@ rule "F5-7 Template Aging not complete - loss below minimum"
         $b : Batch(
             currentPhase == ProductionPhase.DRYING_AGING,
             status != BatchStatus.BLOCKED,
-            eval(!$b.getWeeklyWeightLossPercentages().isEmpty() || $b.getDryingRoomTemperature() > 0 || $b.getDryingRoomHumidity() > 0)
+            !weeklyWeightLossPercentages.isEmpty() || dryingRoomTemperature > 0 || dryingRoomHumidity > 0
         )
         $r : WeightLossRule(
             productType == $b.productType,
-            eval($b.getWeeklyWeightLossPercentages().size() >= deadlineWeeks &&
-                 $b.getTotalWeightLoss() < minWeightLossPercent)
+            $b.weeklyWeightLossPercentages.size() >= deadlineWeeks,
+            $b.getTotalWeightLoss() < minWeightLossPercent
         )
     then
         modify($b) {
@@ -144,13 +146,14 @@ rule "F5-8 Aging complete - advance to Phase 6"
         $b : Batch(
             currentPhase == ProductionPhase.DRYING_AGING,
             status != BatchStatus.BLOCKED,
-            eval(!$b.getWeeklyWeightLossPercentages().isEmpty() || $b.getDryingRoomTemperature() > 0 || $b.getDryingRoomHumidity() > 0),
-            eval($b.getTotalWeightLoss() >= 25.0 && $b.getTotalWeightLoss() <= 35.0)
+            !weeklyWeightLossPercentages.isEmpty() || dryingRoomTemperature > 0 || dryingRoomHumidity > 0,
+            totalWeightLoss >= 25.0,
+            totalWeightLoss <= 35.0
         )
         not WeightLossRule(
             productType == $b.productType,
-            eval($b.getWeeklyWeightLossPercentages().size() >= deadlineWeeks &&
-                 $b.getTotalWeightLoss() < minWeightLossPercent)
+            $b.weeklyWeightLossPercentages.size() >= deadlineWeeks,
+            $b.getTotalWeightLoss() < minWeightLossPercent
         )
     then
         modify($b) {

@@ -31,9 +31,9 @@ rule "F1-2 Receiving pH high - warning"
             currentPhase == ProductionPhase.RECEIVING,
             status != BatchStatus.BLOCKED,
             receivingPh > 6.2,
-            receivingPh <= 6.5
+            receivingPh <= 6.5,
+            !hasActiveAlert("F1-2:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F1-2:"))
     then
         modify($b) {
             addAlert("F1-2: ReceivingPhWarning - pH = " + $b.getReceivingPh() + " (range 6.2-6.5, confirmation required)")
@@ -47,9 +47,9 @@ rule "F1-3 Receiving temperature high"
         $b : Batch(
             currentPhase == ProductionPhase.RECEIVING,
             status != BatchStatus.BLOCKED,
-            receivingTemperature > 7.0
+            receivingTemperature > 7.0,
+            !hasActiveAlert("F1-3:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F1-3:"))
     then
         modify($b) {
             addAlert("F1-3: ReceivingTemperatureHigh - temperature = " + $b.getReceivingTemperature() + " C (> 7 C)")
@@ -64,9 +64,9 @@ rule "F1-4 Raw material shelf life short"
             currentPhase == ProductionPhase.RECEIVING,
             status != BatchStatus.BLOCKED,
             rawMaterialShelfLife != null,
-            eval($b.getDaysUntilRawMaterialExpiry() < 5)
+            daysUntilRawMaterialExpiry < 5,
+            !hasActiveAlert("F1-4:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F1-4:"))
     then
         modify($b) {
             addAlert("F1-4: RawMaterialShelfLifeShort - " + $b.getDaysUntilRawMaterialExpiry() + " days left until expiry")
@@ -80,8 +80,8 @@ rule "F1-5 Escalation - temperature and shelf life together"
         $b : Batch(
             currentPhase == ProductionPhase.RECEIVING,
             status != BatchStatus.BLOCKED,
-            eval($b.getActiveAlerts().toString().contains("F1-3:")),
-            eval($b.getActiveAlerts().toString().contains("F1-4:"))
+            hasActiveAlert("F1-3:"),
+            hasActiveAlert("F1-4:")
         )
     then
         modify($b) {

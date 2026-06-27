@@ -23,6 +23,12 @@ public class Aggregated4hDryer {
         this.sampleCount = sampleCount;
     }
 
+    public Aggregated4hDryer(String batchId, LocalDateTime windowStart, Number averageTemperature,
+                             Number minTemperature, Number maxTemperature, Number sampleCount) {
+        this(batchId, windowStart, averageTemperature.doubleValue(), minTemperature.doubleValue(),
+            maxTemperature.doubleValue(), sampleCount.longValue());
+    }
+
     public String getBatchId() { return batchId; }
     public void setBatchId(String batchId) { this.batchId = batchId; }
 

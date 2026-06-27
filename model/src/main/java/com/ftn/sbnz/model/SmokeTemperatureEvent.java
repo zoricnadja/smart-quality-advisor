@@ -1,6 +1,7 @@
 package com.ftn.sbnz.model;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 public class SmokeTemperatureEvent {
 
@@ -29,4 +30,8 @@ public class SmokeTemperatureEvent {
 
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+
+    public long getTimestampMillis() {
+        return timestamp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+    }
 }

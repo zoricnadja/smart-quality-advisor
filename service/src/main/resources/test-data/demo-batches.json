@@ -1,0 +1,59 @@
+{
+  "saltRules": [
+    { "productType": "KULEN", "minSalt": 2.5, "maxSalt": 3.0 },
+    { "productType": "SAUSAGE", "minSalt": 1.8, "maxSalt": 2.2 }
+  ],
+  "weightLossRules": [
+    { "productType": "KULEN", "minWeightLossPercent": 30.0, "deadlineWeeks": 8 },
+    { "productType": "SAUSAGE", "minWeightLossPercent": 25.0, "deadlineWeeks": 6 }
+  ],
+  "batches": [
+    {
+      "id": "TEST-RECEIVING-BLOCKED",
+      "productType": "KULEN",
+      "currentPhase": "RECEIVING",
+      "receivingPh": 6.8,
+      "receivingTemperature": 5.0,
+      "receivingVisualScore": 4,
+      "expectedResult": "Blocked by F1-1 because receiving pH is above 6.5."
+    },
+    {
+      "id": "TEST-CURING-TEMPLATE",
+      "productType": "KULEN",
+      "currentPhase": "CURING",
+      "saltPercentage": 2.0,
+      "brineTemperature": 5.0,
+      "curingDurationHours": 48,
+      "expectedResult": "Warned by the salt template because kulen requires 2.5-3.0% salt."
+    },
+    {
+      "id": "TEST-FERMENTATION-CEP",
+      "productType": "KULEN",
+      "currentPhase": "FERMENTATION",
+      "fermentationPhByDay": [6.2, 6.13, 6.06, 5.99, 5.92],
+      "fermentationChamberTemperature": 27.0,
+      "fermentationChamberHumidity": 90.0,
+      "expectedResult": "Blocked by chained slow pH trend and high chamber temperature."
+    },
+    {
+      "id": "TEST-FINAL-APPROVED",
+      "productType": "KULEN",
+      "currentPhase": "FINAL_INSPECTION",
+      "finalPh": 4.95,
+      "waterActivity": 0.88,
+      "finalVisualScore": 5,
+      "expectedResult": "Approved by final inspection."
+    }
+  ],
+  "cepPseudoClockEvents": [
+    { "batchId": "CEP-CLOCK-001", "minuteOffset": 0, "temperature": 58.0 },
+    { "batchId": "CEP-CLOCK-001", "minuteOffset": 5, "temperature": 57.5 },
+    { "batchId": "CEP-CLOCK-001", "minuteOffset": 10, "temperature": 58.2 },
+    { "batchId": "CEP-CLOCK-001", "minuteOffset": 15, "temperature": 57.8 },
+    { "batchId": "CEP-CLOCK-001", "minuteOffset": 20, "temperature": 58.4 },
+    { "batchId": "CEP-CLOCK-001", "minuteOffset": 25, "temperature": 57.9 },
+    { "batchId": "CEP-CLOCK-001", "minuteOffset": 30, "temperature": 58.1 },
+    { "batchId": "CEP-CLOCK-001", "minuteOffset": 35, "temperature": 57.7 },
+    { "batchId": "CEP-CLOCK-001", "minuteOffset": 40, "temperature": 58.3 }
+  ]
+}

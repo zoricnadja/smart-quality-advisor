@@ -16,7 +16,7 @@ rule "F2-1 Salt below minimum safe value"
         $b : Batch(
             currentPhase == ProductionPhase.CURING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSaltPercentage() > 0 || $b.getBrineTemperature() > 0 || $b.getCuringDurationHours() > 0),
+            saltPercentage > 0 || brineTemperature > 0 || curingDurationHours > 0,
             saltPercentage < 1.8
         )
     then
@@ -32,13 +32,13 @@ rule "F2-2 Salt outside range for product type (Template)"
         $b : Batch(
             currentPhase == ProductionPhase.CURING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSaltPercentage() > 0 || $b.getBrineTemperature() > 0 || $b.getCuringDurationHours() > 0)
+            saltPercentage > 0 || brineTemperature > 0 || curingDurationHours > 0,
+            !hasActiveAlert("F2-2:")
         )
         $r : SaltRule(
             productType == $b.productType,
-            eval($b.getSaltPercentage() < minSalt || $b.getSaltPercentage() > maxSalt)
+            $b.saltPercentage < minSalt || $b.saltPercentage > maxSalt
         )
-        eval(!$b.getActiveAlerts().toString().contains("F2-2:"))
     then
         modify($b) {
             addAlert("F2-2: SaltOutOfRange - salt = " + $b.getSaltPercentage() +
@@ -53,10 +53,10 @@ rule "F2-3 Brine temperature high"
         $b : Batch(
             currentPhase == ProductionPhase.CURING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSaltPercentage() > 0 || $b.getBrineTemperature() > 0 || $b.getCuringDurationHours() > 0),
-            brineTemperature > 8.0
+            saltPercentage > 0 || brineTemperature > 0 || curingDurationHours > 0,
+            brineTemperature > 8.0,
+            !hasActiveAlert("F2-3:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F2-3:"))
     then
         modify($b) {
             addAlert("F2-3: BrineTemperatureHigh - temperature = " + $b.getBrineTemperature() + " C (> 8 C, danger zone!)")
@@ -70,10 +70,10 @@ rule "F2-4 Brine temperature low"
         $b : Batch(
             currentPhase == ProductionPhase.CURING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSaltPercentage() > 0 || $b.getBrineTemperature() > 0 || $b.getCuringDurationHours() > 0),
-            brineTemperature < 2.0
+            saltPercentage > 0 || brineTemperature > 0 || curingDurationHours > 0,
+            brineTemperature < 2.0,
+            !hasActiveAlert("F2-4:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F2-4:"))
     then
         modify($b) {
             addAlert("F2-4: BrineTemperatureLow - temperature = " + $b.getBrineTemperature() + " C (< 2 C)")
@@ -87,8 +87,8 @@ rule "F2-5 CEP Brine temperature high too long - block"
         $b : Batch(
             currentPhase == ProductionPhase.CURING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSaltPercentage() > 0 || $b.getBrineTemperature() > 0 || $b.getCuringDurationHours() > 0),
-            eval($b.getActiveAlerts().toString().contains("F2-3:"))
+            saltPercentage > 0 || brineTemperature > 0 || curingDurationHours > 0,
+            hasActiveAlert("F2-3:")
         )
     then
         modify($b) {
@@ -104,10 +104,10 @@ rule "F2-6 Curing duration invalid"
         $b : Batch(
             currentPhase == ProductionPhase.CURING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSaltPercentage() > 0 || $b.getBrineTemperature() > 0 || $b.getCuringDurationHours() > 0),
-            curingDurationHours < 24 || curingDurationHours > 96
+            saltPercentage > 0 || brineTemperature > 0 || curingDurationHours > 0,
+            curingDurationHours < 24 || curingDurationHours > 96,
+            !hasActiveAlert("F2-6:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F2-6:"))
     then
         modify($b) {
             addAlert("F2-6: CuringDurationInvalid - duration = " + $b.getCuringDurationHours() + "h (range: 24-96h)")
@@ -120,7 +120,7 @@ rule "F2 Batch can advance to Phase 3"
         $b : Batch(
             currentPhase == ProductionPhase.CURING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSaltPercentage() > 0 || $b.getBrineTemperature() > 0 || $b.getCuringDurationHours() > 0),
+            saltPercentage > 0 || brineTemperature > 0 || curingDurationHours > 0,
             saltPercentage >= 1.8,
             brineTemperature >= 2.0,
             brineTemperature <= 8.0,

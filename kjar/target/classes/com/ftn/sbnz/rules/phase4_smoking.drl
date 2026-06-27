@@ -15,10 +15,10 @@ rule "F4-1 Smoke temperature too high"
         $b : Batch(
             currentPhase == ProductionPhase.SMOKING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSmokeTemperature() > 0 || $b.getSmokingDurationHours() > 0),
-            smokeTemperature > 90.0
+            smokeTemperature > 0 || smokingDurationHours > 0,
+            smokeTemperature > 90.0,
+            !hasActiveAlert("F4-1:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F4-1:"))
     then
         modify($b) {
             addAlert("F4-1: SmokeTemperatureTooHigh - temperature = " + $b.getSmokeTemperature() + " C (> 90 C, case hardening risk)")
@@ -32,10 +32,10 @@ rule "F4-2 Smoke temperature too low"
         $b : Batch(
             currentPhase == ProductionPhase.SMOKING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSmokeTemperature() > 0 || $b.getSmokingDurationHours() > 0),
-            smokeTemperature < 55.0
+            smokeTemperature > 0 || smokingDurationHours > 0,
+            smokeTemperature < 55.0,
+            !hasActiveAlert("F4-2:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F4-2:"))
     then
         modify($b) {
             addAlert("F4-2: SmokeTemperatureTooLow - temperature = " + $b.getSmokeTemperature() + " C (< 55 C, insufficient heat treatment risk)")
@@ -49,10 +49,10 @@ rule "F4-3 CEP Insufficient heat treatment in 15-minute window"
         $b : Batch(
             currentPhase == ProductionPhase.SMOKING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSmokeTemperature() > 0 || $b.getSmokingDurationHours() > 0),
-            smokeTemperature < 60.0
+            smokeTemperature > 0 || smokingDurationHours > 0,
+            smokeTemperature < 60.0,
+            !hasActiveAlert("F4-3:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F4-3:"))
     then
         modify($b) {
             addAlert("F4-3: InsufficientHeatTreatment15min - average smoke temperature = " + $b.getSmokeTemperature() + " C (< 60 C in 15-minute window)")
@@ -66,11 +66,11 @@ rule "F4-4 CEP Insufficient heat treatment for 45+ minutes - critical"
         $b : Batch(
             currentPhase == ProductionPhase.SMOKING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSmokeTemperature() > 0 || $b.getSmokingDurationHours() > 0),
+            smokeTemperature > 0 || smokingDurationHours > 0,
             smokeTemperature < 60.0,
-            eval($b.getActiveAlerts().toString().contains("F4-3:"))
+            hasActiveAlert("F4-3:"),
+            !hasActiveAlert("F4-4:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F4-4:"))
     then
         modify($b) {
             addAlert("F4-4: InsufficientHeatTreatment - smoke temperature < 60 C for 3+ consecutive 15-minute windows (total >= 45 min). CRITICAL!")
@@ -84,8 +84,8 @@ rule "F4-5 Smoking failed - block"
         $b : Batch(
             currentPhase == ProductionPhase.SMOKING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSmokeTemperature() > 0 || $b.getSmokingDurationHours() > 0),
-            eval($b.getActiveAlerts().toString().contains("F4-4:"))
+            smokeTemperature > 0 || smokingDurationHours > 0,
+            hasActiveAlert("F4-4:")
         )
     then
         modify($b) {
@@ -100,10 +100,10 @@ rule "F4-6 Smoking duration too long"
         $b : Batch(
             currentPhase == ProductionPhase.SMOKING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSmokeTemperature() > 0 || $b.getSmokingDurationHours() > 0),
-            smokingDurationHours > 10
+            smokeTemperature > 0 || smokingDurationHours > 0,
+            smokingDurationHours > 10,
+            !hasActiveAlert("F4-6:")
         )
-        eval(!$b.getActiveAlerts().toString().contains("F4-6:"))
     then
         modify($b) {
             addAlert("F4-6: SmokingDurationTooLong - duration = " + $b.getSmokingDurationHours() + "h (> 10h, excessive processing)")
@@ -117,7 +117,7 @@ rule "F4-7 Smoking successful - advance to Phase 5"
         $b : Batch(
             currentPhase == ProductionPhase.SMOKING,
             status != BatchStatus.BLOCKED,
-            eval($b.getSmokeTemperature() > 0 || $b.getSmokingDurationHours() > 0),
+            smokeTemperature > 0 || smokingDurationHours > 0,
             smokeTemperature >= 60.0,
             smokeTemperature <= 85.0,
             smokingDurationHours >= 4,

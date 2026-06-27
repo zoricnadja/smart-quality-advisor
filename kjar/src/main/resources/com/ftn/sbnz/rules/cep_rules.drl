@@ -17,14 +17,29 @@ import com.ftn.sbnz.model.SmokeTemperatureEvent;
 
 declare SmokeTemperatureEvent
     @role(event)
+    @timestamp(timestampMillis)
+    @expires(2h)
 end
 
 declare DryerTemperatureEvent
     @role(event)
+    @timestamp(timestampMillis)
+    @expires(24h)
 end
 
 declare PhMeasurementEvent
     @role(event)
+    @expires(7d)
+end
+
+declare SlowPhTrendEvent
+    @role(event)
+    @expires(7d)
+end
+
+declare FermentationAtRiskEvent
+    @role(event)
+    @expires(7d)
 end
 
 // ============================================================
@@ -53,12 +68,12 @@ rule "C-1 CEP aggregate smoke temperature into 15-minute window"
         insert(new Aggregated15minSmoke(
             $batchId,
             $windowStart,
-            ((Number) $avg).doubleValue(),
-            ((Number) $min).doubleValue(),
-            ((Number) $max).doubleValue(),
-            ((Number) $count).longValue()
+            $avg,
+            $min,
+            $max,
+            $count
         ));
-        System.out.println("  >> CEP C-1 [" + $batchId + "]: Aggregated15min_Dim "
+        System.out.println("  >> CEP C-1 [" + $batchId + "]: Aggregated15min_Smoke "
             + $windowStart + " avg=" + String.format("%.2f", ((Number) $avg).doubleValue())
             + " min=" + String.format("%.2f", ((Number) $min).doubleValue())
             + " max=" + String.format("%.2f", ((Number) $max).doubleValue()));
@@ -79,7 +94,7 @@ rule "C-2 CEP chain three smoke aggregates into 45-minute window"
         double max = Math.max($a1.getMaxTemperature(), Math.max($a2.getMaxTemperature(), $a3.getMaxTemperature()));
 
         insert(new Aggregated45minSmoke($batchId, $start, avg, min, max));
-        System.out.println("  >> CEP C-2 [" + $batchId + "]: Aggregated45min_Dim "
+        System.out.println("  >> CEP C-2 [" + $batchId + "]: Aggregated45min_Smoke "
             + $start + " avg=" + String.format("%.2f", avg));
 end
 
@@ -94,7 +109,7 @@ rule "C-2 CEP insufficient thermal treatment from 45-minute smoke aggregate"
             status != BatchStatus.BLOCKED
         )
         $a : Aggregated45minSmoke(batchId == $batchId, averageTemperature < 60.0)
-        eval(!$b.getActiveAlerts().toString().contains("F4-4:"))
+        eval(!$b.hasActiveAlert("F4-4:"))
     then
         modify($b) {
             addAlert("F4-4: InsufficientHeatTreatment - 45-minute smoke aggregate average = "
@@ -114,7 +129,7 @@ rule "C-3 CEP detect slow pH drop between consecutive days"
     then
         double delta = $previousPh - $currentPh;
         insert(new SlowPhTrendEvent($batchId, $fromDay, $fromDay + 1, delta));
-        System.out.println("  >> CEP C-3 [" + $batchId + "]: TrendPhPresporoOpada day "
+        System.out.println("  >> CEP C-3 [" + $batchId + "]: SlowPhTrend day "
             + $fromDay + "->" + ($fromDay + 1) + " delta=" + String.format("%.2f", delta));
 end
 
@@ -128,7 +143,7 @@ rule "C-4 CEP chain slow pH trend events into fermentation risk"
         not FermentationAtRiskEvent(batchId == $batchId, firstSlowDay == $fromDay, lastSlowDay == $lastDay)
     then
         insert(new FermentationAtRiskEvent($batchId, $fromDay, $lastDay));
-        System.out.println("  >> CEP C-4 [" + $batchId + "]: FermentacijaUgrozena from day "
+        System.out.println("  >> CEP C-4 [" + $batchId + "]: FermentationAtRisk from day "
             + $fromDay + " to day " + $lastDay);
 end
 
@@ -142,7 +157,7 @@ rule "C-4 CEP fermentation risk alert"
             status != BatchStatus.BLOCKED
         )
         $risk : FermentationAtRiskEvent(batchId == $batchId)
-        eval(!$b.getActiveAlerts().toString().contains("F3-6:"))
+        eval(!$b.hasActiveAlert("F3-6:"))
     then
         modify($b) {
             addAlert("F3-6: FermentationAtRisk - chained slow pH trend events from day "
@@ -172,12 +187,12 @@ rule "C-5 CEP aggregate dryer temperature into 4-hour window"
         insert(new Aggregated4hDryer(
             $batchId,
             $windowStart,
-            ((Number) $avg).doubleValue(),
-            ((Number) $min).doubleValue(),
-            ((Number) $max).doubleValue(),
-            ((Number) $count).longValue()
+            $avg,
+            $min,
+            $max,
+            $count
         ));
-        System.out.println("  >> CEP C-5 [" + $batchId + "]: Aggregated4h_Susara "
+        System.out.println("  >> CEP C-5 [" + $batchId + "]: Aggregated4h_Dryer "
             + $windowStart + " avg=" + String.format("%.2f", ((Number) $avg).doubleValue()));
 end
 
@@ -191,7 +206,7 @@ rule "C-5 CEP persistent dryer temperature risk"
             status != BatchStatus.BLOCKED
         )
         $a : Aggregated4hDryer(batchId == $batchId, averageTemperature > 16.0)
-        eval(!$b.getActiveAlerts().toString().contains("F5-5:"))
+        eval(!$b.hasActiveAlert("F5-5:"))
     then
         modify($b) {
             addAlert("F5-5: PersistentDryingTemperatureRisk - 4-hour dryer aggregate average = "

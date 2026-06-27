@@ -16,7 +16,7 @@
     <version>0.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>service</name>
-    <description>Smart Quality Advisor - Service projekat</description>
+    <description>Smart Quality Advisor - Service project</description>
 
     <properties>
         <java.version>11</java.version>
@@ -30,14 +30,14 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- Model projekat -->
+        <!-- Model project -->
         <dependency>
             <groupId>com.ftn.sbnz</groupId>
             <artifactId>model</artifactId>
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
 
-        <!-- Kjar projekat -->
+        <!-- Kjar project -->
         <dependency>
             <groupId>com.ftn.sbnz</groupId>
             <artifactId>kjar</artifactId>
@@ -63,6 +63,11 @@
         <dependency>
             <groupId>org.drools</groupId>
             <artifactId>drools-compiler</artifactId>
+            <version>${drools.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.drools</groupId>
+            <artifactId>drools-templates</artifactId>
             <version>${drools.version}</version>
         </dependency>
 

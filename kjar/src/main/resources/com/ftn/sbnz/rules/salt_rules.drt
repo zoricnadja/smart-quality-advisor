@@ -1,0 +1,32 @@
+template header
+productType
+minSalt
+maxSalt
+
+package com.ftn.sbnz.rules;
+
+import com.ftn.sbnz.model.Batch;
+import com.ftn.sbnz.model.SaltRule;
+import com.ftn.sbnz.model.ProductType;
+import com.ftn.sbnz.model.BatchStatus;
+import com.ftn.sbnz.model.ProductionPhase;
+
+template "salt-rules"
+
+rule "Salt check for @{productType}_@{row.rowNumber}"
+    salience 95
+    no-loop
+    when
+        $b : Batch(
+            productType == ProductType.@{productType},
+            currentPhase == ProductionPhase.CURING,
+            status != BatchStatus.BLOCKED,
+            (saltPercentage < @{minSalt} || saltPercentage > @{maxSalt})
+        )
+    then
+        modify($b) {
+            addAlert("F2-T: SaltOutRange - salt = " + $b.getSaltPercentage() + "%, allowed range for @{productType} is @{minSalt}-@{maxSalt}%")
+        };
+end
+
+end template

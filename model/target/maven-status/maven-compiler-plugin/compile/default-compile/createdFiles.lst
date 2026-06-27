@@ -6,6 +6,7 @@ com\ftn\sbnz\model\FermentationAtRiskEvent.class
 com\ftn\sbnz\model\SmokeTemperatureEvent.class
 com\ftn\sbnz\model\Aggregated15minSmoke.class
 com\ftn\sbnz\model\ProductionPhase.class
+com\ftn\sbnz\model\ExplanationEdge.class
 com\ftn\sbnz\model\SlowPhTrendEvent.class
 com\ftn\sbnz\model\Aggregated45minSmoke.class
 com\ftn\sbnz\model\SaltRule.class

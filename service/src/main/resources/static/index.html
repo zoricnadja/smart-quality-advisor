@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smart Quality Advisor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="app-header">
+        <div>
+            <p class="eyebrow">Knowledge-Based Quality Control</p>
+            <h1>Smart Quality Advisor</h1>
+        </div>
+        <div class="status-pill" id="service-status">Service ready</div>
+    </header>
+
+    <main class="shell">
+        <section class="control-panel" aria-label="Demonstration controls">
+            <button type="button" data-endpoint="/api/quality/demo">Run Full Rule Demo</button>
+            <button type="button" data-endpoint="/api/quality/cep-demo">Run CEP Demo</button>
+            <button type="button" data-endpoint="/api/quality/cep-pseudo-clock-demo">Run CEP Pseudo Clock</button>
+            <button type="button" data-endpoint="/api/quality/template-demo">Run Template Demo</button>
+            <button type="button" data-endpoint="/api/quality/backward-demo">Run Backward Chaining</button>
+        </section>
+
+        <section class="dashboard" aria-label="Demonstration output">
+            <div class="summary-strip">
+                <article>
+                    <span>Forward chaining</span>
+                    <strong>6 phases</strong>
+                </article>
+                <article>
+                    <span>CEP</span>
+                    <strong>stream rules</strong>
+                </article>
+                <article>
+                    <span>Templates</span>
+                    <strong>salt and aging</strong>
+                </article>
+                <article>
+                    <span>Backward chaining</span>
+                    <strong>explanations</strong>
+                </article>
+            </div>
+
+            <pre id="output">Select a demonstration to run. Results will appear here.</pre>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
