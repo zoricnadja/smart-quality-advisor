@@ -16,35 +16,98 @@
     </header>
 
     <main class="shell">
-        <section class="control-panel" aria-label="Demonstration controls">
-            <button type="button" data-endpoint="/api/quality/demo">Run Full Rule Demo</button>
-            <button type="button" data-endpoint="/api/quality/cep-demo">Run CEP Demo</button>
-            <button type="button" data-endpoint="/api/quality/cep-pseudo-clock-demo">Run CEP Pseudo Clock</button>
-            <button type="button" data-endpoint="/api/quality/template-demo">Run Template Demo</button>
-            <button type="button" data-endpoint="/api/quality/backward-demo">Run Backward Chaining</button>
-        </section>
+        <!-- ============ INTERACTIVE RULE TESTER ============ -->
+        <section class="card form-card" aria-label="Interactive rule evaluation">
+            <h2>Rule tester</h2>
+            <p class="muted">
+                Choose a phase, enter the parameters that drive its rules, then run the evaluation.
+                The result shows whether an alarm / warning was raised, the batch status, and how the
+                rule engine reached that decision.
+            </p>
 
-        <section class="dashboard" aria-label="Demonstration output">
-            <div class="summary-strip">
-                <article>
-                    <span>Forward chaining</span>
-                    <strong>6 phases</strong>
-                </article>
-                <article>
-                    <span>CEP</span>
-                    <strong>stream rules</strong>
-                </article>
-                <article>
-                    <span>Templates</span>
-                    <strong>salt and aging</strong>
-                </article>
-                <article>
-                    <span>Backward chaining</span>
-                    <strong>explanations</strong>
-                </article>
+            <div class="grid-2">
+                <label>
+                    Batch ID
+                    <input type="text" id="batchId" value="UI-BATCH-001">
+                </label>
+                <label>
+                    Product type
+                    <select id="productType">
+                        <option value="KULEN">KULEN</option>
+                        <option value="SAUSAGE">SAUSAGE</option>
+                        <option value="OTHER">OTHER</option>
+                    </select>
+                </label>
             </div>
 
-            <pre id="output">Select a demonstration to run. Results will appear here.</pre>
+            <label>
+                Phase to test
+                <select id="phase">
+                    <option value="RECEIVING">Phase 1 – Raw material receiving</option>
+                    <option value="CURING">Phase 2 – Curing</option>
+                    <option value="FERMENTATION">Phase 3 – Fermentation</option>
+                    <option value="SMOKING">Phase 4 – Smoking</option>
+                    <option value="DRYING_AGING">Phase 5 – Drying / aging</option>
+                    <option value="FINAL_INSPECTION">Phase 6 – Final inspection</option>
+                </select>
+            </label>
+
+            <!-- Phase-specific fields are rendered here by app.js -->
+            <div id="phase-fields"></div>
+
+            <!-- Optional template rules (shown per phase by app.js) -->
+            <div id="template-fields"></div>
+
+            <div class="actions">
+                <button type="button" id="evaluate-btn" class="primary">Evaluate batch</button>
+                <button type="button" id="fill-example-btn" class="ghost">Fill example values</button>
+            </div>
+        </section>
+
+        <!-- ============ STRUCTURED RESULT ============ -->
+        <section class="card result-card" aria-label="Evaluation result">
+            <h2>Result</h2>
+            <div id="result-empty" class="muted">Run an evaluation to see the outcome here.</div>
+
+            <div id="result" hidden>
+                <div class="result-head">
+                    <span class="badge" id="result-outcome">—</span>
+                    <span class="result-meta" id="result-meta"></span>
+                </div>
+
+                <div class="result-block">
+                    <h3>Triggered alerts / warnings</h3>
+                    <ul id="result-alerts" class="alert-list"></ul>
+                </div>
+
+                <div class="result-block" id="applied-templates-block" hidden>
+                    <h3>Applied template rules</h3>
+                    <ul id="result-templates" class="plain-list"></ul>
+                </div>
+
+                <div class="result-block">
+                    <h3>How it was derived – reasoning log</h3>
+                    <ol id="result-log" class="log-list"></ol>
+                </div>
+
+                <div class="result-block" id="explanation-block" hidden>
+                    <h3>Backward-chaining explanation (why blocked)</h3>
+                    <div id="result-explanation" class="explanation-tree"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ PREBUILT DEMOS ============ -->
+        <section class="card" aria-label="Demonstration controls">
+            <h2>Prebuilt demonstrations</h2>
+            <div class="control-panel">
+                <button type="button" data-endpoint="/api/quality/demo">Full Rule Demo</button>
+                <button type="button" data-endpoint="/api/quality/cep-demo">CEP Demo</button>
+                <button type="button" data-endpoint="/api/quality/cep-pseudo-clock-demo">CEP Pseudo Clock</button>
+                <button type="button" data-endpoint="/api/quality/template-demo">Template Demo</button>
+                <button type="button" data-endpoint="/api/quality/backward-demo">Backward Chaining</button>
+            </div>
+            <pre id="demo-output">Select a demonstration to run. Results will appear here.</pre>
         </section>
     </main>
 

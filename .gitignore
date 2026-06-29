@@ -88,3 +88,7 @@ Thumbs.db
 # macOS
 .AppleDouble
 .LSOverride
+PRIMERI/
+dodatak/
+*.md
+*.pdf

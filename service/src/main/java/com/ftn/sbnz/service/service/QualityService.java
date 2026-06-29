@@ -1,6 +1,10 @@
 package com.ftn.sbnz.service.service;
 
 import com.ftn.sbnz.model.*;
+import com.ftn.sbnz.service.dto.BatchEvaluationRequest;
+import com.ftn.sbnz.service.dto.EvaluationResult;
+import com.ftn.sbnz.service.dto.ExplanationNode;
+import com.ftn.sbnz.service.dto.SaltTemplateRowDto;
 import org.kie.api.builder.Message;
 import org.kie.api.builder.Results;
 import org.kie.api.io.ResourceType;
@@ -116,6 +120,175 @@ public class QualityService {
         sausageRow.put("maxSalt", 2.2);
         data.add(sausageRow);
         return data;
+    }
+
+    /**
+     * Interactive evaluation: builds a batch from user-supplied parameters, runs the
+     * Drools rules for the chosen phase, and returns the decision, the triggered
+     * alerts/warnings, the full reasoning log and (when blocked) the backward-chaining
+     * explanation tree describing HOW the decision was reached.
+     */
+    public EvaluationResult evaluateBatch(BatchEvaluationRequest request) {
+        ProductType productType = parseProductType(request.getProductType());
+        String id = (request.getId() == null || request.getId().isBlank())
+            ? "UI-BATCH" : request.getId().trim();
+
+        Batch batch = new Batch(id, productType);
+        ProductionPhase phase = parsePhase(request.getPhase());
+        batch.setCurrentPhase(phase);
+
+        applyPhaseParameters(batch, phase, request);
+
+        SaltRule saltRule = toSaltRule(request.getSaltRule());
+        WeightLossRule weightLossRule = toWeightLossRule(request.getWeightLossRule());
+        PhFermentationRule phFermentationRule = toPhFermentationRule(request.getPhFermentationRule());
+
+        List<String> appliedTemplateRules = new ArrayList<>();
+
+        // 1) Optional free-form salt .drt template rows: compiled and run as a
+        //    dedicated template session so the generated rules can fire too.
+        runSaltTemplateRows(batch, request.getSaltTemplateRows(), appliedTemplateRules);
+
+        // 2) Main phase evaluation with the typed template-rule facts.
+        runRules(batch, saltRule, weightLossRule, phFermentationRule);
+
+        if (saltRule != null) {
+            appliedTemplateRules.add("SaltRule(" + saltRule.getProductType() + ", "
+                + saltRule.getMinSalt() + "-" + saltRule.getMaxSalt() + "%)");
+        }
+        if (weightLossRule != null) {
+            appliedTemplateRules.add("WeightLossRule(" + weightLossRule.getProductType() + ", min "
+                + weightLossRule.getMinWeightLossPercent() + "% after " + weightLossRule.getDeadlineWeeks() + " weeks)");
+        }
+        if (phFermentationRule != null) {
+            appliedTemplateRules.add("PhFermentationRule(" + phFermentationRule.getProductType()
+                + ", day5 pH <= " + phFermentationRule.getPhThresholdDay5() + ")");
+        }
+
+        EvaluationResult result = new EvaluationResult();
+        result.setBatchId(batch.getId());
+        result.setProductType(String.valueOf(batch.getProductType()));
+        result.setPhase(String.valueOf(batch.getCurrentPhase()));
+        result.setStatus(String.valueOf(batch.getStatus()));
+        result.setAlerts(new ArrayList<>(batch.getActiveAlerts()));
+        result.setLog(new ArrayList<>(batch.getLog()));
+        result.setAppliedTemplateRules(appliedTemplateRules);
+        result.setOutcome(deriveOutcome(batch));
+
+        // Backward-chaining explanation only makes sense for a blocked batch.
+        if (batch.isBlocked()) {
+            ExplanationNode explanation =
+                backwardChainingService.explainWhyBlocked(batch, saltRule, weightLossRule);
+            result.setExplanation(explanation);
+        }
+
+        return result;
+    }
+
+    private String deriveOutcome(Batch batch) {
+        if (batch.getStatus() == BatchStatus.BLOCKED) return "BLOCKED";
+        if (batch.getStatus() == BatchStatus.APPROVED) return "APPROVED";
+        boolean advanced = batch.getLog().stream().anyMatch(l -> l.contains("[ADVANCE]"));
+        if (!batch.getActiveAlerts().isEmpty()) return "WARNING";
+        if (advanced) return "ADVANCED";
+        return "NO_TRIGGER";
+    }
+
+    private ProductType parseProductType(String value) {
+        if (value == null || value.isBlank()) return ProductType.KULEN;
+        try {
+            return ProductType.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return ProductType.OTHER;
+        }
+    }
+
+    private ProductionPhase parsePhase(String value) {
+        if (value == null || value.isBlank()) return ProductionPhase.RECEIVING;
+        return ProductionPhase.valueOf(value.trim().toUpperCase());
+    }
+
+    private void applyPhaseParameters(Batch batch, ProductionPhase phase, BatchEvaluationRequest r) {
+        switch (phase) {
+            case RECEIVING:
+                if (r.getReceivingPh() != null) batch.setReceivingPh(r.getReceivingPh());
+                if (r.getReceivingTemperature() != null) batch.setReceivingTemperature(r.getReceivingTemperature());
+                if (r.getReceivingVisualScore() != null) batch.setReceivingVisualScore(r.getReceivingVisualScore());
+                if (r.getRawMaterialShelfLifeDays() != null) {
+                    batch.setRawMaterialShelfLife(LocalDate.now().plusDays(r.getRawMaterialShelfLifeDays()));
+                }
+                break;
+            case CURING:
+                if (r.getSaltPercentage() != null) batch.setSaltPercentage(r.getSaltPercentage());
+                if (r.getBrineTemperature() != null) batch.setBrineTemperature(r.getBrineTemperature());
+                if (r.getCuringDurationHours() != null) batch.setCuringDurationHours(r.getCuringDurationHours());
+                break;
+            case FERMENTATION:
+                if (r.getFermentationPhByDay() != null) batch.setFermentationPhByDay(new ArrayList<>(r.getFermentationPhByDay()));
+                if (r.getFermentationChamberTemperature() != null) batch.setFermentationChamberTemperature(r.getFermentationChamberTemperature());
+                if (r.getFermentationChamberHumidity() != null) batch.setFermentationChamberHumidity(r.getFermentationChamberHumidity());
+                break;
+            case SMOKING:
+                if (r.getSmokeTemperature() != null) batch.setSmokeTemperature(r.getSmokeTemperature());
+                if (r.getSmokingDurationHours() != null) batch.setSmokingDurationHours(r.getSmokingDurationHours());
+                break;
+            case DRYING_AGING:
+                if (r.getWeeklyWeightLossPercentages() != null) batch.setWeeklyWeightLossPercentages(new ArrayList<>(r.getWeeklyWeightLossPercentages()));
+                if (r.getDryingRoomTemperature() != null) batch.setDryingRoomTemperature(r.getDryingRoomTemperature());
+                if (r.getDryingRoomHumidity() != null) batch.setDryingRoomHumidity(r.getDryingRoomHumidity());
+                break;
+            case FINAL_INSPECTION:
+                if (r.getFinalPh() != null) batch.setFinalPh(r.getFinalPh());
+                if (r.getWaterActivity() != null) batch.setWaterActivity(r.getWaterActivity());
+                if (r.getFinalVisualScore() != null) batch.setFinalVisualScore(r.getFinalVisualScore());
+                break;
+            default:
+                break;
+        }
+    }
+
+    private SaltRule toSaltRule(BatchEvaluationRequest.SaltRuleDto dto) {
+        if (dto == null || dto.getMinSalt() == null || dto.getMaxSalt() == null) return null;
+        return new SaltRule(parseProductType(dto.getProductType()), dto.getMinSalt(), dto.getMaxSalt());
+    }
+
+    private WeightLossRule toWeightLossRule(BatchEvaluationRequest.WeightLossRuleDto dto) {
+        if (dto == null || dto.getMinWeightLossPercent() == null || dto.getDeadlineWeeks() == null) return null;
+        return new WeightLossRule(parseProductType(dto.getProductType()), dto.getMinWeightLossPercent(), dto.getDeadlineWeeks());
+    }
+
+    private PhFermentationRule toPhFermentationRule(BatchEvaluationRequest.PhFermentationRuleDto dto) {
+        if (dto == null || dto.getPhThresholdDay5() == null) return null;
+        return new PhFermentationRule(parseProductType(dto.getProductType()), dto.getPhThresholdDay5());
+    }
+
+    /**
+     * Compiles user-supplied salt .drt template rows and runs them against the batch
+     * in a dedicated template session, merging any alerts/log into the batch.
+     */
+    private void runSaltTemplateRows(Batch batch, List<SaltTemplateRowDto> rows, List<String> appliedTemplateRules) {
+        if (rows == null || rows.isEmpty()) return;
+
+        List<Map<String, Object>> data = new ArrayList<>();
+        for (SaltTemplateRowDto row : rows) {
+            if (row.getProductType() == null || row.getMinSalt() == null || row.getMaxSalt() == null) continue;
+            Map<String, Object> map = new HashMap<>();
+            map.put("productType", row.getProductType().trim().toUpperCase());
+            map.put("minSalt", row.getMinSalt());
+            map.put("maxSalt", row.getMaxSalt());
+            data.add(map);
+            appliedTemplateRules.add("Salt .drt row: " + map.get("productType")
+                + " range " + row.getMinSalt() + "-" + row.getMaxSalt() + "%");
+        }
+        if (data.isEmpty()) return;
+
+        KieSession ks = createSessionWithTemplates(data);
+        try {
+            ks.insert(batch);
+            ks.fireAllRules();
+        } finally {
+            ks.dispose();
+        }
     }
 
     /**

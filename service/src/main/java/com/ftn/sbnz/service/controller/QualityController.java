@@ -1,9 +1,13 @@
 package com.ftn.sbnz.service.controller;
 
+import com.ftn.sbnz.service.dto.BatchEvaluationRequest;
+import com.ftn.sbnz.service.dto.EvaluationResult;
 import com.ftn.sbnz.service.service.QualityService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -57,5 +61,18 @@ public class QualityController {
     @GetMapping("/backward-demo")
     public String runBackwardChainingDemo() {
         return qualityService.runBackwardChainingDemo();
+    }
+
+    /**
+     * POST /api/quality/evaluate
+     * Interactive evaluation of a single batch with user-supplied parameters
+     * (and optional template rules) for the chosen phase. Returns the decision,
+     * triggered alerts/warnings, the reasoning log and the backward-chaining
+     * explanation when the batch is blocked.
+     */
+    @PostMapping(value = "/evaluate", consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE)
+    public EvaluationResult evaluate(@RequestBody BatchEvaluationRequest request) {
+        return qualityService.evaluateBatch(request);
     }
 }
